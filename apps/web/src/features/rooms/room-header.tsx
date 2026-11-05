@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 
 import { MessageBody } from '@/features/messages/message-body';
 import { canFavoriteRooms, useCapabilities } from '@/features/server/use-capabilities';
+import { TasraBadge } from '@/features/tasra/tasra-badge';
+import { useTasraSlot } from '@/features/tasra/use-tasra-channel';
 import { cn } from '@/lib/cn';
 import { useUiStore } from '@/stores/ui-store';
 import { Avatar } from '@/ui/avatar';
@@ -102,6 +104,8 @@ export const RoomHeader = ({
 
   const rootTabId = stack[0]?.id;
 
+  const tasraSlotId = useTasraSlot(room);
+
   // The mark beside the name follows the sidebar and the info panel: the peer's
   // picture in a direct message, the room's own where it has one, and the type
   // icon only when there is no picture to show instead.
@@ -166,6 +170,7 @@ export const RoomHeader = ({
               className="flex min-w-0 items-center gap-1.5 rounded-lg text-left"
             >
               <h1 className="truncate text-sm font-semibold">{room?.displayName ?? tCommon('state.loading')}</h1>
+              {tasraSlotId ? <TasraBadge slotId={tasraSlotId} /> : null}
               <Icons.chevronDown size={14} className="text-content-muted shrink-0" />
             </button>
 

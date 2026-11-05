@@ -62,6 +62,9 @@
     "unpin": "Bỏ ghim",
     "empty": "Chưa ghim tin nhắn nào."
   },
+  "tasra": {
+    "encryptedChannel": "Kênh mã hóa — khe {{slotId}}"
+  },
   "placeholder": {
     "noRoom": "Chọn một phòng để bắt đầu",
     "noRoomHint": "Các cuộc trò chuyện của bạn nằm ở cột bên trái.",
@@ -118,7 +121,10 @@
     "readOnlyBroadcastHint": "Kênh phát thanh luôn ở chế độ chỉ đọc.",
     "readOnlyDeniedHint": "Bạn không có quyền đặt phòng ở chế độ chỉ đọc.",
     "encryptedOffHint": "Máy chủ này đã tắt mã hoá đầu cuối.",
-    "encryptedPrivateOnlyHint": "Chỉ kênh riêng tư mới có thể mã hoá."
+    "encryptedPrivateOnlyHint": "Chỉ kênh riêng tư mới có thể mã hoá.",
+    "tasraSlot": "Mã khe Tasra",
+    "tasraSlotHint": "0x theo sau 64 ký tự hex",
+    "tasraSlotInvalid": "Phải là 0x theo sau 64 ký tự hex"
   },
   "edit": {
     "title": "Sửa phòng",
@@ -130,7 +136,9 @@
     "makePrivateHint": "Chỉ người được mời mới tìm thấy.",
     "submit": "Lưu thay đổi",
     "announcementHint": "Hiển thị ở đầu phòng cho mọi người.",
-    "makePrivateDeniedHint": "Bạn không có quyền thay đổi loại phòng này."
+    "makePrivateDeniedHint": "Bạn không có quyền thay đổi loại phòng này.",
+    "tasraSlot": "Mã khe Tasra",
+    "tasraSlotInvalid": "Phải là 0x theo sau 64 ký tự hex"
   },
   "leaveConfirm": {
     "title": "Rời {{name}}?",

@@ -130,6 +130,11 @@
   "reaction": {
     "reactedBy": "Reacted by {{names}}"
   },
+  "tasra": {
+    "encrypted": "Encrypted message — click to decrypt",
+    "decrypting": "Decrypting…",
+    "cannotDecrypt": "Cannot decrypt this message"
+  },
   "attachments_one": "{{count}} attachment",
   "attachments_other": "{{count}} attachments"
 }

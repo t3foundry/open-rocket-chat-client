@@ -115,6 +115,10 @@ export const serverKeys = (serverId: string) => {
     /** Slash commands the server offers. Server configuration, so barely ever changes. */
     commands: [...scope, 'commands'] as const,
     customEmoji: [...scope, 'emoji', 'custom'] as const,
+    /** The Tasra deployment this server's gateway fronts — chain id and key registry. */
+    tasraDeployment: [...scope, 'tasra', 'deployment'] as const,
+    /** Public key and epoch for one Tasra BLS slot. */
+    tasraSlotPublicKey: (slotId: string) => [...scope, 'tasra', 'slot', slotId] as const,
   };
 };
 

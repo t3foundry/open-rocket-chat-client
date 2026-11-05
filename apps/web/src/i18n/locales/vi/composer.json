@@ -31,7 +31,8 @@
   "editing": {
     "label": "Đang sửa:",
     "noText": "(không có nội dung)",
-    "cancel": "Dừng sửa"
+    "cancel": "Dừng sửa",
+    "encryptedMessage": "Tin nhắn được mã hóa"
   },
   "quoting": {
     "label": "Đang trích dẫn {{name}}:",

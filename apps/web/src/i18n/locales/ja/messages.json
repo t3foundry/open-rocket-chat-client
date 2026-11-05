@@ -130,6 +130,11 @@
   "reaction": {
     "reactedBy": "リアクションしたユーザー: {{names}}"
   },
+  "tasra": {
+    "encrypted": "暗号化されたメッセージ — クリックして復号",
+    "decrypting": "復号中…",
+    "cannotDecrypt": "このメッセージは復号できません"
+  },
   "attachments_one": "添付ファイル {{count}}件",
   "attachments_other": "添付ファイル {{count}}件"
 }

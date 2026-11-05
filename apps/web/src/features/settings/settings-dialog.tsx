@@ -1,11 +1,14 @@
 import type { ColorSchemePreference } from '@open-rocket-chat/theme';
+import { createLocalWallet } from '@t3foundry/tasra-sdk/app';
 import * as Dialog from '@radix-ui/react-dialog';
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GiphyKeyLink } from '@/features/messages/gif-picker';
 import { hasBuildTimeGiphyKey, useGiphyKeyStore } from '@/features/messages/giphy';
 import { NotificationSettings } from '@/features/notifications/notification-settings';
+import { getDeployment } from '@/features/tasra/deployment';
+import { hasBuildTimeCreatorKey, useCreatorKey, useCreatorKeyStore } from '@/features/tasra/creator-key-store';
 import { useThemeStore } from '@/features/theme/theme-store';
 import { changeLocale, LOCALES, type LocaleCode } from '@/i18n';
 import { cn } from '@/lib/cn';
@@ -25,6 +28,7 @@ const SETTINGS_TABS = [
   { id: 'notifications', labelKey: 'notifications.title', icon: Icons.notifications },
   { id: 'gif', labelKey: 'gif.title', icon: Icons.gif },
   { id: 'language', labelKey: 'language.title', icon: Icons.translate },
+  { id: 'tasra', labelKey: 'tasra.title', icon: Icons.private },
 ] as const;
 
 type SettingsTab = (typeof SETTINGS_TABS)[number]['id'];
@@ -153,6 +157,15 @@ export const SettingsDialog = () => {
               hidden={activeTab !== 'language'}
             >
               <LanguageSettings />
+            </div>
+            <div
+              id="settings-panel-tasra"
+              role="tabpanel"
+              aria-labelledby="settings-tab-tasra"
+              tabIndex={activeTab === 'tasra' ? 0 : -1}
+              hidden={activeTab !== 'tasra'}
+            >
+              <TasraSettings />
             </div>
           </div>
         </Dialog.Content>
@@ -293,6 +306,56 @@ const LanguageSettings = () => {
       >
         <Icons.openExternal size={14} /> {t('language.helpTranslate')}
       </a>
+    </>
+  );
+};
+
+/**
+ * Derives the EVM address from the creator key for display.
+ * Returns `null` when the key is unset or invalid.
+ */
+const deriveAddress = (key: `0x${string}` | undefined): `0x${string}` | null => {
+  if (!key) return null;
+  try {
+    const wallet = createLocalWallet(getDeployment(), { privateKey: key });
+    return wallet.address;
+  } catch {
+    return null;
+  }
+};
+
+const TasraSettings = () => {
+  const { t } = useTranslation('settings');
+  const creatorKey = useCreatorKey();
+  const userKey = useCreatorKeyStore((state) => state.userKey);
+  const setUserKey = useCreatorKeyStore((state) => state.setUserKey);
+
+  const address = useMemo(() => deriveAddress(creatorKey), [creatorKey]);
+
+  return (
+    <>
+      <label htmlFor="tasra-creator-key" className="mb-1.5 block text-sm font-medium">
+        {t('tasra.creatorKey')}
+      </label>
+      <Input
+        id="tasra-creator-key"
+        // The key is sensitive, but showing it lets the user verify and fix
+        // typos — the same reason the GIPHY key is not a password field.
+        value={userKey}
+        onChange={(event) => setUserKey(event.target.value)}
+        placeholder={hasBuildTimeCreatorKey ? t('tasra.creatorKeyHint') : t('tasra.creatorKeyPlaceholder')}
+        spellCheck={false}
+        autoComplete="off"
+        className="h-9 text-sm font-mono"
+      />
+      <p className="text-content-muted mt-1.5 text-xs">{t('tasra.creatorKeyHint')}</p>
+
+      <div className="mt-4 rounded-lg border border-line bg-sunken px-3 py-2.5">
+        <span className="text-content-muted text-xs">{t('tasra.signerAddress')}</span>
+        <span className="ml-2 font-mono text-sm">
+          {address ?? <span className="text-content-muted italic">{t('tasra.signerAddressNone')}</span>}
+        </span>
+      </div>
     </>
   );
 };

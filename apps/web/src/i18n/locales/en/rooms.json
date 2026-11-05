@@ -64,6 +64,9 @@
     "unpin": "Unpin",
     "empty": "Nothing pinned yet."
   },
+  "tasra": {
+    "encryptedChannel": "Encrypted channel — slot {{slotId}}"
+  },
   "placeholder": {
     "noRoom": "Pick a room to start",
     "noRoomHint": "Your conversations are listed on the left.",
@@ -120,7 +123,10 @@
     "readOnlyBroadcastHint": "A broadcast channel is always read only.",
     "readOnlyDeniedHint": "You do not have permission to make a room read only.",
     "encryptedOffHint": "This server has end-to-end encryption switched off.",
-    "encryptedPrivateOnlyHint": "Only private channels can be encrypted."
+    "encryptedPrivateOnlyHint": "Only private channels can be encrypted.",
+    "tasraSlot": "Tasra Slot ID",
+    "tasraSlotHint": "0x followed by 64 hex characters",
+    "tasraSlotInvalid": "Must be 0x followed by 64 hex characters"
   },
   "edit": {
     "title": "Edit room",
@@ -132,7 +138,9 @@
     "makePrivateHint": "Only invited people can find it.",
     "submit": "Save changes",
     "announcementHint": "Shown at the top of the room for everyone.",
-    "makePrivateDeniedHint": "You do not have permission to change this room's type."
+    "makePrivateDeniedHint": "You do not have permission to change this room's type.",
+    "tasraSlot": "Tasra Slot ID",
+    "tasraSlotInvalid": "Must be 0x followed by 64 hex characters"
   },
   "leaveConfirm": {
     "title": "Leave {{name}}?",

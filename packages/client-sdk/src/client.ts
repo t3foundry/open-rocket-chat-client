@@ -24,6 +24,10 @@ import type {
   UpdateRoomNotificationsRequest,
   UpdateRoomRequest,
   GetUserResponse,
+  GetDeploymentResponse,
+  GetPublicKeyResponse,
+  IssueDocumentReaderRequest,
+  IssueDocumentReaderResponse,
   ListMessagesQuery,
   ListMessagesResponse,
   ListRoomMembersResponse,
@@ -393,6 +397,19 @@ export class OpenRocketChatClient {
      */
     run: (input: RunCommandRequest): Promise<RunCommandResponse> =>
       this.http.request('/commands/run', { method: 'POST', body: input }),
+  };
+
+  readonly tasra = {
+    /** The chain identity a `tasra-encrypt/v2` manifest has to name. */
+    deployment: (): Promise<GetDeploymentResponse> => this.http.request('/tasra/deployment'),
+
+    /** A slot's BLS master public key and its current epoch, for IBE encryption. */
+    publicKey: (slotId: string): Promise<GetPublicKeyResponse> =>
+      this.http.request('/tasra/public-key', { query: { slotId } }),
+
+    /** Mints a Holder-bound `DocumentReader` credential for one slot. */
+    issueDocumentReader: (input: IssueDocumentReaderRequest): Promise<IssueDocumentReaderResponse> =>
+      this.http.request('/tasra/credentials/document-reader', { method: 'POST', body: input }),
   };
 
   /**

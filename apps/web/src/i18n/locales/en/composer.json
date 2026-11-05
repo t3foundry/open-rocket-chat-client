@@ -31,7 +31,8 @@
   "editing": {
     "label": "Editing:",
     "noText": "(no text)",
-    "cancel": "Stop editing"
+    "cancel": "Stop editing",
+    "encryptedMessage": "Encrypted message"
   },
   "quoting": {
     "label": "Quoting {{name}}:",

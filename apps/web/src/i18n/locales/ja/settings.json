@@ -46,5 +46,13 @@
     "title": "言語",
     "label": "表示言語",
     "helpTranslate": "翻訳に協力"
+  },
+  "tasra": {
+    "title": "Tasra",
+    "creatorKey": "クリエイターキー",
+    "creatorKeyPlaceholder": "EVM秘密鍵を貼り付け (0x…)",
+    "creatorKeyHint": "スロット作成者のEVM秘密鍵。復号・認可操作の署名に使用されます。⚠ このブラウザにのみ保存。開発/テスト用 — 本番環境では接続ウォレットを使用してください。",
+    "signerAddress": "署名者アドレス",
+    "signerAddressNone": "キーが設定されていません"
   }
 }

@@ -7,6 +7,9 @@ import { useTranslation } from 'react-i18next';
 import { useRealtime } from '@/features/realtime/realtime-provider';
 import { useRoom } from '@/features/rooms/use-rooms';
 import { useServerConnection, useServerId } from '@/features/servers/server-scope';
+import { looksEncrypted, type EncryptedRecord } from '@/features/tasra/detect';
+import { sealMessage } from '@/features/tasra/crypto';
+import { useTasraDeployment, useSlotPublicKey, useTasraSlot } from '@/features/tasra/use-tasra-channel';
 import { cn } from '@/lib/cn';
 import { describeError } from '@/lib/errors';
 import { hasModifier, modifierKey, sendsOnEnter } from '@/lib/keys';
@@ -110,6 +113,11 @@ export const Composer = ({
   const { data: timeline } = useMessages(roomId);
   const { data: room } = useRoom(roomId);
   const { user } = useServerConnection();
+
+  // Tasra encrypted-channel detection and key material for seal-on-send.
+  const tasraSlot = useTasraSlot(room);
+  const { data: deployment } = useTasraDeployment();
+  const { data: publicKeyData } = useSlotPublicKey(tasraSlot ?? undefined);
 
   const maxLength = maxMessageLength(capabilities);
   const uploadsAllowed = canUpload(capabilities, room);
@@ -324,6 +332,13 @@ export const Composer = ({
     // now would post the text and silently drop the recording.
     if (isRecording) return;
 
+    // Per spec §8: never silently fall back to plaintext. When the channel is
+    // encrypted but key material is still loading (React Query async), block
+    // the send. The button stays functional; the user retries when data arrives.
+    if (tasraSlot && (!publicKeyData || !deployment)) {
+      return;
+    }
+
     /*
      * Length is settled before anything else, as it is in Rocket.Chat's own
      * flow: the server refuses an over-long message whatever it was meant to
@@ -360,7 +375,42 @@ export const Composer = ({
       setSending(true);
 
       try {
-        await edit.mutateAsync({ messageId: editing.messageId, text });
+        let editText = text;
+
+        // In an encrypted channel, seal the edit before sending. If the
+        // original was already encrypted, carry forward the record id and
+        // bump the version; otherwise treat it as a fresh record.
+        if (tasraSlot && publicKeyData && deployment) {
+          // Guard: the public key must start with 0x to be a valid hex string.
+          if (!publicKeyData.publicKey.startsWith('0x')) {
+            setError(tMessages('tasra.cannotDecrypt'));
+            return;
+          }
+
+          const originalEncrypted = looksEncrypted(editing.originalText);
+          let recordId: string;
+          let version: number;
+
+          if (originalEncrypted) {
+            const original = JSON.parse(editing.originalText) as EncryptedRecord;
+            recordId = original.manifest.recordId;
+            version = original.manifest.version + 1;
+          } else {
+            recordId = crypto.randomUUID();
+            version = 0;
+          }
+
+          const encrypted = await sealMessage(
+            editText,
+            { slotId: tasraSlot, publicKey: publicKeyData.publicKey as `0x${string}`, epoch: publicKeyData.epoch },
+            recordId,
+            version,
+            { chainId: deployment.chainId, keyRegistry: deployment.keyRegistry },
+          );
+          editText = JSON.stringify(encrypted);
+        }
+
+        await edit.mutateAsync({ messageId: editing.messageId, text: editText });
         // Clears the edit's draft slot too, handing the box back to whatever
         // was being typed before.
         stopEditing();
@@ -412,12 +462,54 @@ export const Composer = ({
           ...(threadId ? { threadId } : {}),
         });
       } else if (staged.length === 0 && !convertsToFile) {
-        await send.mutateAsync({ text: outgoing, ...(threadId ? { threadId } : {}) });
+        // In an encrypted channel, seal the full outgoing text (quote + body)
+        // as one tasra-encrypt/v2 record before it leaves the client.
+        let sendText = outgoing;
+        if (tasraSlot && publicKeyData && deployment) {
+          // Guard: the public key must start with 0x to be a valid hex string.
+          if (!publicKeyData.publicKey.startsWith('0x')) {
+            setError(tMessages('tasra.cannotDecrypt'));
+            return;
+          }
+
+          const encrypted = await sealMessage(
+            outgoing,
+            { slotId: tasraSlot, publicKey: publicKeyData.publicKey as `0x${string}`, epoch: publicKeyData.epoch },
+            crypto.randomUUID(),
+            0,
+            { chainId: deployment.chainId, keyRegistry: deployment.keyRegistry },
+          );
+          sendText = JSON.stringify(encrypted);
+        }
+        await send.mutateAsync({ text: sendText, ...(threadId ? { threadId } : {}) });
       } else {
         // Rocket.Chat's upload endpoint takes one file per request, so the
         // composer text rides along with the first file as its message and the
         // rest are posted with their own captions.
         let uploaded = 0;
+
+        // In an encrypted channel, seal the text that rides along with the
+        // first file. The .txt file path (convertsToFile) is skipped: the file
+        // content is the message, and wrapping ciphertext in a .txt would be
+        // self-defeating. Note: captions on subsequent files remain plaintext;
+        // text encryption for uploads with incomplete key material is a known
+        // limitation tracked separately.
+        const sealedText =
+          tasraSlot && publicKeyData && deployment && publicKeyData.publicKey.startsWith('0x')
+            ? JSON.stringify(
+                await sealMessage(
+                  outgoing,
+                  {
+                    slotId: tasraSlot,
+                    publicKey: publicKeyData.publicKey as `0x${string}`,
+                    epoch: publicKeyData.epoch,
+                  },
+                  crypto.randomUUID(),
+                  0,
+                  { chainId: deployment.chainId, keyRegistry: deployment.keyRegistry },
+                ),
+              )
+            : null;
 
         // The draft the server would refuse goes up as its own file, ahead of
         // anything staged, so it reads as the message it was written to be —
@@ -447,7 +539,7 @@ export const Composer = ({
               ...(item.caption ? { description: item.caption } : {}),
               // The text belongs to the first file that actually goes up, not
               // to whichever one was first before the removals.
-              ...(uploaded === 0 && outgoing ? { text: outgoing } : {}),
+              ...(uploaded === 0 && (sealedText ?? outgoing) ? { text: sealedText ?? outgoing } : {}),
               ...(threadId ? { threadId } : {}),
             });
             uploaded += 1;
@@ -894,7 +986,11 @@ export const Composer = ({
           <Icons.edit size={14} className="text-accent shrink-0" />
           <p className="min-w-0 flex-1 truncate text-xs">
             <span className="text-accent font-semibold">{t('editing.label')}</span>{' '}
-            <span className="text-content-muted">{editing.originalText.trim() || t('editing.noText')}</span>
+            <span className="text-content-muted">
+              {looksEncrypted(editing.originalText)
+                ? t('editing.encryptedMessage')
+                : editing.originalText.trim() || t('editing.noText')}
+            </span>
           </p>
           <button
             type="button"

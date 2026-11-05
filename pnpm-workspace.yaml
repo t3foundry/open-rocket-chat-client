@@ -1,3 +1,12 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# The gateway repo owns the shared contract and Rocket.Chat SDKs. Until they are
+# published to npm, resolve them from a sibling checkout so both repos can be
+# developed together. See CONTRIBUTING.md.
+overrides:
+  '@open-rocket-chat/api-contract': link:../open-rocket-chat-gateway/packages/api-contract
+
+allowBuilds:
+  esbuild: true

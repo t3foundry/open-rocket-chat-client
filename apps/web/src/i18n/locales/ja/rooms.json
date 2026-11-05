@@ -64,6 +64,9 @@
     "unpin": "ピン留めを解除",
     "empty": "ピン留めされた項目はまだありません。"
   },
+  "tasra": {
+    "encryptedChannel": "暗号化チャンネル — スロット {{slotId}}"
+  },
   "placeholder": {
     "noRoom": "ルームを選択して開始",
     "noRoomHint": "会話は左側に表示されます。",
@@ -120,7 +123,10 @@
     "readOnlyBroadcastHint": "ブロードキャストチャンネルは常に読み取り専用です。",
     "readOnlyDeniedHint": "ルームを読み取り専用にする権限がありません。",
     "encryptedOffHint": "このサーバーではエンドツーエンド暗号化が無効です。",
-    "encryptedPrivateOnlyHint": "非公開チャンネルだけを暗号化できます。"
+    "encryptedPrivateOnlyHint": "非公開チャンネルだけを暗号化できます。",
+    "tasraSlot": "Tasra スロット ID",
+    "tasraSlotHint": "0x に続く 64 桁の 16 進数",
+    "tasraSlotInvalid": "0x に続く 64 桁の 16 進数で入力してください"
   },
   "edit": {
     "title": "ルームを編集",
@@ -132,7 +138,9 @@
     "makePrivateHint": "招待されたユーザーだけが見つけられます。",
     "submit": "変更を保存",
     "announcementHint": "全員にルームの上部で表示されます。",
-    "makePrivateDeniedHint": "このルームの種類を変更する権限がありません。"
+    "makePrivateDeniedHint": "このルームの種類を変更する権限がありません。",
+    "tasraSlot": "Tasra スロット ID",
+    "tasraSlotInvalid": "0x に続く 64 桁の 16 進数で入力してください"
   },
   "leaveConfirm": {
     "title": "{{name}} から退出しますか？",

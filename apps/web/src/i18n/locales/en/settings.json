@@ -46,5 +46,13 @@
     "title": "Language",
     "label": "Display language",
     "helpTranslate": "Help translate"
+  },
+  "tasra": {
+    "title": "Tasra",
+    "creatorKey": "Creator key",
+    "creatorKeyPlaceholder": "Paste an EVM private key (0x…)",
+    "creatorKeyHint": "The slot creator's EVM private key, used to sign decrypt and authorize operations. ⚠ Stored in this browser only. Dev/test only — production must use a connected wallet.",
+    "signerAddress": "Signer address",
+    "signerAddressNone": "No key configured"
   }
 }

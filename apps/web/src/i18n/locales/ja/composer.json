@@ -31,7 +31,8 @@
   "editing": {
     "label": "編集中:",
     "noText": "（テキストなし）",
-    "cancel": "編集を中止"
+    "cancel": "編集を中止",
+    "encryptedMessage": "暗号化されたメッセージ"
   },
   "quoting": {
     "label": "{{name}} を引用:",

@@ -13,6 +13,7 @@ import {
   type Capabilities,
   type CreateRoomKind,
 } from '@/features/server/use-capabilities';
+import { TASRA_SLOT_ID_PATTERN } from '@/features/tasra/detect';
 import { cn } from '@/lib/cn';
 import { describeError } from '@/lib/errors';
 import { Button } from '@/ui/button';
@@ -152,6 +153,9 @@ const CreateFields = ({
   const [broadcast, setBroadcast] = useState(false);
   const [members, setMembers] = useState<UserSummary[]>([]);
   const [memberQuery, setMemberQuery] = useState('');
+  const [tasraSlot, setTasraSlot] = useState('');
+  const tasraSlotError =
+    tasraSlot.trim() && !TASRA_SLOT_ID_PATTERN.test(tasraSlot.trim()) ? t('create.tasraSlotInvalid') : null;
 
   const pending = createRoom.isPending || createDirect.isPending;
   const error = createRoom.error ?? createDirect.error;
@@ -182,13 +186,20 @@ const CreateFields = ({
     }
 
     if (nameProblem) return;
+    if (tasraSlotError) return;
+
+    // Build the full description: prefix with `tasra:<slotId> ` if a slot is
+    // set, otherwise send the plain description as-is.
+    const fullDescription = tasraSlot.trim()
+      ? `tasra:${tasraSlot.trim()} ${description.trim()}`.trim()
+      : description.trim();
 
     createRoom.mutate(
       {
         type: kind,
         name: trimmedName,
         ...(topic.trim() ? { topic: topic.trim() } : {}),
-        ...(description.trim() ? { description: description.trim() } : {}),
+        ...(fullDescription ? { description: fullDescription } : {}),
         // The creator is added by the server, so only the invitees travel.
         ...(members.length > 0 ? { memberUsernames: members.map((user) => user.username) } : {}),
         readOnly: effectiveReadOnly,
@@ -273,6 +284,22 @@ const CreateFields = ({
               />
             </Field>
 
+            <Field
+              id="room-tasra-slot"
+              label={t('create.tasraSlot')}
+              hint={t('create.tasraSlotHint')}
+              error={tasraSlotError ?? undefined}
+            >
+              <Input
+                id="room-tasra-slot"
+                value={tasraSlot}
+                onChange={(event) => setTasraSlot(event.target.value)}
+                placeholder="0x…"
+                aria-invalid={tasraSlotError ? true : undefined}
+                aria-describedby={tasraSlotError ? 'room-tasra-slot-error' : undefined}
+              />
+            </Field>
+
             <div className="border-line divide-line divide-y border-t pt-2">
               <SwitchField
                 id="room-read-only"
@@ -328,7 +355,12 @@ const CreateFields = ({
         <Button size="md" onClick={onDone}>
           {tCommon('action.cancel')}
         </Button>
-        <Button type="submit" variant="primary" size="md" disabled={!trimmedName || Boolean(nameProblem) || pending}>
+        <Button
+          type="submit"
+          variant="primary"
+          size="md"
+          disabled={!trimmedName || Boolean(nameProblem) || Boolean(tasraSlotError) || pending}
+        >
           {pending ? <Spinner className="size-4" /> : null}
           {kind === 'direct' ? t('create.directSubmit') : t('create.submit')}
         </Button>

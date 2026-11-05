@@ -16,6 +16,7 @@ import {
   groupingPeriodMs,
   useCapabilities,
 } from '@/features/server/use-capabilities';
+import { useTasraSlot } from '@/features/tasra/use-tasra-channel';
 import { cn } from '@/lib/cn';
 import { describeError } from '@/lib/errors';
 import { showToast } from '@/stores/toast-store';
@@ -97,6 +98,7 @@ export const MessageList = ({
 
   const { data: capabilities } = useCapabilities();
   const { data: room } = useRoom(roomId);
+  const tasraSlot = useTasraSlot(room);
 
   const viewport = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -342,6 +344,7 @@ export const MessageList = ({
         }}
         onOpenThread={() => openTab({ id: 'thread', messageId: anchor.threadId ?? anchor.id })}
         onOpenRoom={onOpenRoom}
+        tasraSlot={tasraSlot}
       />
     );
   };

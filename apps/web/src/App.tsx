@@ -17,6 +17,7 @@ import { ServerRail } from '@/features/servers/server-rail';
 import { ServerScope } from '@/features/servers/server-scope';
 import { resolveActiveServerId, useServerStore } from '@/features/servers/server-store';
 import { SettingsDialog } from '@/features/settings/settings-dialog';
+import { TasraProvider } from '@/features/tasra/tasra-provider';
 import { useThemeStore } from '@/features/theme/theme-store';
 import { useUiStore } from '@/stores/ui-store';
 import { Icons, IconProvider, Spinner } from '@/ui/icon';
@@ -187,61 +188,67 @@ export const App = () => {
   };
 
   return (
-    <IconProvider>
-      {/* Outside the server scope: one socket carries every server, and
-          remounting it on each switch would cost a reconnect. */}
-      <RealtimeProvider enabled>
-        {/* Outside the server scope as well: the server pushes notifications
-            for every account the session holds, not only the one on screen. */}
-        <DesktopNotifications open={{ serverId: activeServerId, roomId }} onOpenRoom={openFromNotification} />
+    <TasraProvider>
+      <IconProvider>
+        {/* Outside the server scope: one socket carries every server, and
+            remounting it on each switch would cost a reconnect. */}
+        <RealtimeProvider enabled>
+          {/* Outside the server scope as well: the server pushes notifications
+              for every account the session holds, not only the one on screen. */}
+          <DesktopNotifications open={{ serverId: activeServerId, roomId }} onOpenRoom={openFromNotification} />
 
-        <ServerScope connection={connection}>
-          <PluginProvider>
-            <div className="bg-app flex h-full flex-col">
-              {/* In the flow rather than floating over the app: it appears
-                  without warning, and an overlay would land on the room header
-                  and its actions. */}
-              <ConnectionStatusBanner />
+          <ServerScope connection={connection}>
+            <PluginProvider>
+              <div className="bg-app flex h-full flex-col">
+                {/* In the flow rather than floating over the app: it appears
+                    without warning, and an overlay would land on the room header
+                    and its actions. */}
+                <ConnectionStatusBanner />
 
-              <div className="flex min-h-0 flex-1">
-                <ServerRail connections={session.connections} activeServerId={activeServerId} onSelect={selectServer} />
+                <div className="flex min-h-0 flex-1">
+                  <ServerRail
+                    connections={session.connections}
+                    activeServerId={activeServerId}
+                    onSelect={selectServer}
+                  />
 
-                {/* Always mounted: it animates between its full width and a rail, and
-                a component that unmounts cannot animate its way out. */}
-                <Sidebar
-                  key={activeServerId}
-                  activeRoomId={roomId}
-                  onSelectRoom={selectRoom}
-                  onOpenSettings={() => setSettingsOpen(true)}
-                />
+                  {/* Always mounted: it animates between its full width and a rail, and
+                  a component that unmounts cannot animate its way out. */}
+                  <Sidebar
+                    key={activeServerId}
+                    activeRoomId={roomId}
+                    onSelectRoom={selectRoom}
+                    onOpenSettings={() => setSettingsOpen(true)}
+                  />
 
-                {roomId ? (
-                  <RoomView key={`${activeServerId}:${roomId}`} roomId={roomId} onOpenRoom={selectRoom} />
-                ) : (
-                  <div className="text-content-muted flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-                    <Icons.direct size={40} className="opacity-40" />
-                    <div>
-                      <p className="text-content text-sm font-medium">{t('placeholder.noRoom')}</p>
-                      <p className="mt-1 text-sm">{t('placeholder.noRoomHint')}</p>
+                  {roomId ? (
+                    <RoomView key={`${activeServerId}:${roomId}`} roomId={roomId} onOpenRoom={selectRoom} />
+                  ) : (
+                    <div className="text-content-muted flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+                      <Icons.direct size={40} className="opacity-40" />
+                      <div>
+                        <p className="text-content text-sm font-medium">{t('placeholder.noRoom')}</p>
+                        <p className="mt-1 text-sm">{t('placeholder.noRoomHint')}</p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
 
-            <RoomDrawer />
-            <SettingsDialog />
-            <MediaLightbox />
-            <AddServerDialog />
-            {/* After the drawer: it explains a control inside it, so it has to
-                paint on top rather than behind. */}
-            <FeatureNoticeDialog />
-            {/* Last, so it paints over the drawers and dialogs above rather
-                than under them. */}
-            <Toaster />
-          </PluginProvider>
-        </ServerScope>
-      </RealtimeProvider>
-    </IconProvider>
+              <RoomDrawer />
+              <SettingsDialog />
+              <MediaLightbox />
+              <AddServerDialog />
+              {/* After the drawer: it explains a control inside it, so it has to
+                  paint on top rather than behind. */}
+              <FeatureNoticeDialog />
+              {/* Last, so it paints over the drawers and dialogs above rather
+                  than under them. */}
+              <Toaster />
+            </PluginProvider>
+          </ServerScope>
+        </RealtimeProvider>
+      </IconProvider>
+    </TasraProvider>
   );
 };

@@ -1,0 +1,17 @@
+{
+  "manifest": {
+    "schema": "tasra-encrypt/v2",
+    "recordId": "d24bb896-89e8-428e-a160-d0b13366fcc1",
+    "title": "message",
+    "version": 0,
+    "documentSha256": "b766cafa9880e902719246c6744148cb1fb7eb6677d1e2cdc37f7577830b03ee",
+    "chainId": 43113,
+    "keyRegistry": "0x45f432ab5709e9920b5ec349d29663d7200a8c39",
+    "slotId": "0x05eea2ad0e0ba9a794be552b563269377bd5a17bca4e0c56246a4305ba461a3f"
+  },
+  "envelope": {
+    "encryptedAesKey": "AgXuoq0OC6mnlL5VK1YyaTd71aF7yk4MViRqQwW6Rho/AAAAAAAAAABAAGI3NjZjYWZhOTg4MGU5MDI3MTkyNDZjNjc0NDE0OGNiMWZiN2ViNjY3N2QxZTJjZGMzN2Y3NTc3ODMwYjAzZWWUqTlCo59vPr+v40+CQ8UF+Sok3+QvMlGF+/CTOP26Rj0kHr2TO29dQgFmwWfIiooQZA7ON08NFsaAVyZuVgly+uFnJ4y5cQu8jrtK2uNI2u+1o6xygFhm0IFIJLQkQ5muNbpiVrvQlITsBcIwAAAAaByM6NACHp3aPrKxGafMvs6BtBp9i7n1kz1KA1HKRcSW6VWrE+rpv15QiaOCpJMD",
+    "aesCiphertext": "qLD+B/MGkw8vMVZCAtO1BDh+udlf3qYaafXe9aHgH0EhW7PBeh9M48KFYOF4",
+    "epoch": 0
+  }
+}

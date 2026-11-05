@@ -128,5 +128,10 @@
   "reaction": {
     "reactedBy": "Biểu cảm bởi {{names}}"
   },
+  "tasra": {
+    "encrypted": "Tin nhắn đã mã hóa — nhấp để giải mã",
+    "decrypting": "Đang giải mã…",
+    "cannotDecrypt": "Không thể giải mã tin nhắn này"
+  },
   "attachments_other": "{{count}} tệp đính kèm"
 }

@@ -46,5 +46,13 @@
     "title": "Ngôn ngữ",
     "label": "Ngôn ngữ hiển thị",
     "helpTranslate": "Đóng góp bản dịch"
+  },
+  "tasra": {
+    "title": "Tasra",
+    "creatorKey": "Khóa người tạo",
+    "creatorKeyPlaceholder": "Dán khóa riêng EVM (0x…)",
+    "creatorKeyHint": "Khóa riêng EVM của người tạo slot, dùng để ký các thao tác giải mã và ủy quyền. ⚠ Chỉ lưu trong trình duyệt này. Dành cho dev/test — production phải dùng ví kết nối.",
+    "signerAddress": "Địa chỉ người ký",
+    "signerAddressNone": "Chưa có khóa"
   }
 }

@@ -11,6 +11,7 @@ import {
   hasPermission,
   useCapabilities,
 } from '@/features/server/use-capabilities';
+import { parseTasraSlot, TASRA_SLOT_ID_PATTERN } from '@/features/tasra/detect';
 import { describeError } from '@/lib/errors';
 import { Button } from '@/ui/button';
 import { Spinner } from '@/ui/icon';
@@ -66,13 +67,21 @@ export const RoomEditForm = ({ room, onDone }: { room: RoomSummary; onDone: () =
   const updateAvatar = useUpdateRoomAvatar(room.id);
   const { data: capabilities } = useCapabilities();
 
+  const existingSlot = parseTasraSlot(room.description);
+  const plainDescription = existingSlot
+    ? (room.description ?? '').replace(/^tasra:0x[0-9a-fA-F]{64}\s*/, '')
+    : (room.description ?? '');
+
   const [name, setName] = useState(room.name ?? '');
   const [topic, setTopic] = useState(room.topic ?? '');
-  const [description, setDescription] = useState(room.description ?? '');
+  const [description, setDescription] = useState(plainDescription);
   const [announcement, setAnnouncement] = useState(room.announcement ?? '');
   const [readOnly, setReadOnly] = useState(room.readOnly);
   const [archived, setArchived] = useState(room.archived);
   const [isPrivate, setPrivate] = useState(room.type !== 'channel');
+  const [tasraSlotInput, setTasraSlotInput] = useState(existingSlot ?? '');
+  const tasraSlotError =
+    tasraSlotInput.trim() && !TASRA_SLOT_ID_PATTERN.test(tasraSlotInput.trim()) ? t('edit.tasraSlotInvalid') : null;
 
   // Rocket.Chat grants these separately from `edit-room`, and a server that
   // withholds one still allows the rest of the form.
@@ -89,6 +98,13 @@ export const RoomEditForm = ({ room, onDone }: { room: RoomSummary; onDone: () =
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (nameProblem) return;
+    if (tasraSlotError) return;
+
+    // Build the full description: prefix with `tasra:<slotId> ` if a slot is
+    // set, otherwise send the plain description as-is.
+    const fullDescription = tasraSlotInput.trim()
+      ? `tasra:${tasraSlotInput.trim()} ${description.trim()}`.trim()
+      : description;
 
     // Only what actually changed: Rocket.Chat applies every field it receives,
     // and resending an unchanged value can trip permission checks the user
@@ -97,7 +113,7 @@ export const RoomEditForm = ({ room, onDone }: { room: RoomSummary; onDone: () =
     const changes = {
       ...(name !== (room.name ?? '') ? { name } : {}),
       ...(topic !== (room.topic ?? '') ? { topic } : {}),
-      ...(description !== (room.description ?? '') ? { description } : {}),
+      ...(fullDescription !== (room.description ?? '') ? { description: fullDescription } : {}),
       ...(announcement !== (room.announcement ?? '') ? { announcement } : {}),
       ...(readOnly !== room.readOnly ? { readOnly } : {}),
       ...(archived !== room.archived ? { archived } : {}),
@@ -164,6 +180,24 @@ export const RoomEditForm = ({ room, onDone }: { room: RoomSummary; onDone: () =
           />
         </Field>
 
+        {room.type !== 'direct' ? (
+          <Field
+            id="edit-tasra-slot"
+            label={t('edit.tasraSlot')}
+            hint={t('create.tasraSlotHint')}
+            error={tasraSlotError ?? undefined}
+          >
+            <Input
+              id="edit-tasra-slot"
+              value={tasraSlotInput}
+              onChange={(event) => setTasraSlotInput(event.target.value)}
+              placeholder="0x…"
+              aria-invalid={tasraSlotError ? true : undefined}
+              aria-describedby={tasraSlotError ? 'edit-tasra-slot-error' : undefined}
+            />
+          </Field>
+        ) : null}
+
         <Field id="edit-announcement" label={t('edit.announcement')} hint={t('edit.announcementHint')}>
           <Input
             id="edit-announcement"
@@ -208,7 +242,12 @@ export const RoomEditForm = ({ room, onDone }: { room: RoomSummary; onDone: () =
         <Button size="md" onClick={onDone}>
           {tCommon('action.cancel')}
         </Button>
-        <Button type="submit" variant="primary" size="md" disabled={Boolean(nameProblem) || updateRoom.isPending}>
+        <Button
+          type="submit"
+          variant="primary"
+          size="md"
+          disabled={Boolean(nameProblem) || Boolean(tasraSlotError) || updateRoom.isPending}
+        >
           {updateRoom.isPending ? <Spinner className="size-4" /> : null}
           {t('edit.submit')}
         </Button>
