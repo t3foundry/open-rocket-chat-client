@@ -16,7 +16,7 @@
 # `link:` override, and a link cannot reach outside the build context. Once the
 # contract is published to npm, the override goes away and this collapses back
 # to an ordinary single-repository build.
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
