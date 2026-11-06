@@ -5,7 +5,7 @@ Thanks for helping out.
 ## Setup
 
 This repository is developed alongside
-[open-rocket-chat-gateway](https://github.com/zscontributor/open-rocket-chat-gateway), which owns the shared
+[open-rocket-chat-gateway](https://github.com/t3foundry/rocket-chat-gateway), which owns the shared
 API contract. Until those packages are published to npm, this one resolves
 `@open-rocket-chat/api-contract` through a pnpm `link:` override pointing at a sibling checkout, so the two
 must share a parent directory:

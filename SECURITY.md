@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report privately rather than opening a public issue: use GitHub's
-[private vulnerability reporting](https://github.com/zscontributor/open-rocket-chat-client/security/advisories/new)
+[private vulnerability reporting](https://github.com/t3foundry/open-rocket-chat-client/security/advisories/new)
 on this repository.
 
 Please include the affected version or commit, what an attacker can achieve, and steps to reproduce.
@@ -14,7 +14,7 @@ We aim to acknowledge within a few days. This is a volunteer-maintained project,
 
 This repository is a browser client. Two neighbours have their own reporting channels:
 
-- The gateway, including sessions, cookies and the media proxy — [open-rocket-chat-gateway](https://github.com/zscontributor/open-rocket-chat-gateway/security/policy).
+- The gateway, including sessions, cookies and the media proxy — [open-rocket-chat-gateway](https://github.com/t3foundry/rocket-chat-gateway/security/policy).
 - Rocket.Chat itself — [Rocket.Chat's security team](https://docs.rocket.chat/docs/security).
 
 In scope here:
@@ -29,7 +29,7 @@ In scope here:
 
 Rocket.Chat's REST API authenticates with an `X-Auth-Token` header, and that token grants full account access — reading every room, posting as the user, changing their profile. A browser client talking to Rocket.Chat directly must hold it, so a single XSS bug anywhere on the page, in any dependency, hands over the account.
 
-This client therefore talks only to the [gateway](https://github.com/zscontributor/open-rocket-chat-gateway) and holds nothing but an opaque `HttpOnly` session cookie. There is no mode that connects straight to Rocket.Chat, and pull requests adding one will be declined — the property cannot hold "sometimes". The Playwright suite asserts it on every run:
+This client therefore talks only to the [gateway](https://github.com/t3foundry/rocket-chat-gateway) and holds nothing but an opaque `HttpOnly` session cookie. There is no mode that connects straight to Rocket.Chat, and pull requests adding one will be declined — the property cannot hold "sometimes". The Playwright suite asserts it on every run:
 
 ```ts
 expect(exposed.local).not.toMatch(/authToken|X-Auth-Token/i);

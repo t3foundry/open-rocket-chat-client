@@ -20,7 +20,7 @@ you fork this into a private repository and wonder why the same commands fail.
 Run once as a repository admin, with `gh auth status` showing the `repo` scope.
 
 ```bash
-REPO=zscontributor/open-rocket-chat-client
+REPO=t3foundry/open-rocket-chat-client
 
 for BRANCH in main develop; do
   # `strict` on main only: a release branch is worth rebasing onto the latest

@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0.0, minor versions may carry breaking changes; the gateway API contract this client is built against is versioned separately and travels in [open-rocket-chat-gateway](https://github.com/zscontributor/open-rocket-chat-gateway).
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0.0, minor versions may carry breaking changes; the gateway API contract this client is built against is versioned separately and travels in [open-rocket-chat-gateway](https://github.com/t3foundry/rocket-chat-gateway).
 
 ## [0.1.2] — 2026-08-03
 
@@ -49,7 +49,7 @@ Progress measures the browser-to-gateway leg, which is the whole journey only wh
 
 ## [0.1.0] — 2026-08-02
 
-First public release. An independent, community-driven frontend for [Rocket.Chat](https://rocket.chat)-compatible servers: React 19 and Vite, built as static files you can serve from anywhere, talking to Rocket.Chat only through the [Open Rocket.Chat Gateway](https://github.com/zscontributor/open-rocket-chat-gateway) so no Rocket.Chat auth token ever reaches the browser.
+First public release. An independent, community-driven frontend for [Rocket.Chat](https://rocket.chat)-compatible servers: React 19 and Vite, built as static files you can serve from anywhere, talking to Rocket.Chat only through the [Open Rocket.Chat Gateway](https://github.com/t3foundry/rocket-chat-gateway) so no Rocket.Chat auth token ever reaches the browser.
 
 Pairs with **gateway 0.1.0**. This is a `0.x` release: it has run in production at [Z-SOFT](https://z-soft.com.vn) for internal team chat, but the API contract between the two repositories is not frozen yet.
 
@@ -122,7 +122,7 @@ Pairs with **gateway 0.1.0**. This is a `0.x` release: it has run in production 
 ### Requirements
 
 - Node.js >= 20.11, pnpm 10.28.2
-- An [Open Rocket.Chat Gateway](https://github.com/zscontributor/open-rocket-chat-gateway) 0.1.0 instance in front of a Rocket.Chat server (tested end-to-end against Rocket.Chat 8.6.1)
+- An [Open Rocket.Chat Gateway](https://github.com/t3foundry/rocket-chat-gateway) 0.1.0 instance in front of a Rocket.Chat server (tested end-to-end against Rocket.Chat 8.6.1)
 - Until the shared packages are published to npm, this repository resolves `@open-rocket-chat/api-contract` from a sibling gateway checkout via a pnpm `link:` override, so both repositories must sit in the same parent directory. See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ### Not included
@@ -137,6 +137,6 @@ Pairs with **gateway 0.1.0**. This is a `0.x` release: it has run in production 
 
 MIT © [Z-SOFT Co., Ltd.](https://z-soft.com.vn) The whole production dependency tree is 174 packages under permissive terms only — no copyleft licence appears in what you serve.
 
-[0.1.2]: https://github.com/zscontributor/open-rocket-chat-client/releases/tag/v0.1.2
-[0.1.1]: https://github.com/zscontributor/open-rocket-chat-client/releases/tag/v0.1.1
-[0.1.0]: https://github.com/zscontributor/open-rocket-chat-client/releases/tag/v0.1.0
+[0.1.2]: https://github.com/t3foundry/open-rocket-chat-client/releases/tag/v0.1.2
+[0.1.1]: https://github.com/t3foundry/open-rocket-chat-client/releases/tag/v0.1.1
+[0.1.0]: https://github.com/t3foundry/open-rocket-chat-client/releases/tag/v0.1.0

@@ -6,7 +6,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zscontributor/open-rocket-chat-client.git"
+    "url": "git+https://github.com/t3foundry/open-rocket-chat-client.git"
   },
   "engines": {
     "node": ">=20.11"

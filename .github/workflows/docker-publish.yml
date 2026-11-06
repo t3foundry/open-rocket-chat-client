@@ -34,7 +34,7 @@ jobs:
       - name: Checkout gateway (shared contract)
         uses: actions/checkout@v4
         with:
-          repository: zscontributor/open-rocket-chat-gateway
+          repository: t3foundry/rocket-chat-gateway
           path: open-rocket-chat-gateway
           token: ${{ secrets.CONTRACT_REPO_TOKEN || github.token }}
 

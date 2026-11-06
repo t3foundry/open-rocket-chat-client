@@ -299,7 +299,7 @@ const LanguageSettings = () => {
       />
 
       <a
-        href="https://github.com/zscontributor/open-rocket-chat-client/blob/main/docs/i18n.md"
+        href="https://github.com/t3foundry/open-rocket-chat-client/blob/main/docs/i18n.md"
         target="_blank"
         rel="noreferrer"
         className="text-accent mt-3 inline-flex items-center gap-1.5 text-xs font-medium hover:underline"
