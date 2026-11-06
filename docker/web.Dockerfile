@@ -12,7 +12,7 @@
 #     -t zsoft/open-rocket-chat-web .
 #
 # The parent directory has to be the context because this repository resolves
-# `@open-rocket-chat/api-contract` from the gateway checkout through a pnpm
+# `@t3foundry/open-rocket-chat-api-contract` from the gateway checkout through a pnpm
 # `link:` override, and a link cannot reach outside the build context. Once the
 # contract is published to npm, the override goes away and this collapses back
 # to an ordinary single-repository build.
@@ -31,7 +31,7 @@ COPY open-rocket-chat-gateway/ open-rocket-chat-gateway/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
   cd open-rocket-chat-gateway \
   && pnpm install --frozen-lockfile \
-  && pnpm --filter @open-rocket-chat/api-contract build
+  && pnpm --filter @t3foundry/open-rocket-chat-api-contract build
 
 COPY open-rocket-chat-client/ open-rocket-chat-client/
 WORKDIR /src/open-rocket-chat-client

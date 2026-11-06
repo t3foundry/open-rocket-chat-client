@@ -4,7 +4,7 @@ import {
   type ClientCommand,
   type ServerEvent,
   type ServerEventType,
-} from '@open-rocket-chat/api-contract';
+} from '@t3foundry/open-rocket-chat-api-contract';
 
 export type RealtimeStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'closed';
 

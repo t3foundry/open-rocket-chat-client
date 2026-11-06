@@ -123,7 +123,7 @@ Pairs with **gateway 0.1.0**. This is a `0.x` release: it has run in production 
 
 - Node.js >= 20.11, pnpm 10.28.2
 - An [Open Rocket.Chat Gateway](https://github.com/t3foundry/rocket-chat-gateway) 0.1.0 instance in front of a Rocket.Chat server (tested end-to-end against Rocket.Chat 8.6.1)
-- Until the shared packages are published to npm, this repository resolves `@open-rocket-chat/api-contract` from a sibling gateway checkout via a pnpm `link:` override, so both repositories must sit in the same parent directory. See [CONTRIBUTING.md](CONTRIBUTING.md)
+- Until the shared packages are published to npm, this repository resolves `@t3foundry/open-rocket-chat-api-contract` from a sibling gateway checkout via a pnpm `link:` override, so both repositories must sit in the same parent directory. See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ### Not included
 

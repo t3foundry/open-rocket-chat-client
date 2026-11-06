@@ -57,7 +57,7 @@ jobs:
         working-directory: open-rocket-chat-gateway
         run: |
           pnpm install --frozen-lockfile
-          pnpm --filter @open-rocket-chat/api-contract build
+          pnpm --filter @t3foundry/open-rocket-chat-api-contract build
 
       - name: Install
         working-directory: open-rocket-chat-client
@@ -128,7 +128,7 @@ jobs:
         working-directory: open-rocket-chat-gateway
         run: |
           pnpm install --frozen-lockfile
-          pnpm --filter @open-rocket-chat/api-contract build
+          pnpm --filter @t3foundry/open-rocket-chat-api-contract build
 
       - name: Install
         working-directory: open-rocket-chat-client

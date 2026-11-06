@@ -46,7 +46,7 @@ import type {
   UpdateMyStatusRequest,
   UpdateMyStatusResponse,
   UpdateRoomStateRequest,
-} from '@open-rocket-chat/api-contract';
+} from '@t3foundry/open-rocket-chat-api-contract';
 
 import { HttpTransport, type TransportOptions, type UploadProgress } from './http.js';
 import { RealtimeConnection, type RealtimeOptions } from './realtime.js';

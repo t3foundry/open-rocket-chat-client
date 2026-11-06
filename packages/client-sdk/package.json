@@ -31,7 +31,7 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
-    "@open-rocket-chat/api-contract": "link:../../../open-rocket-chat-gateway/packages/api-contract"
+    "@t3foundry/open-rocket-chat-api-contract": "link:../../../open-rocket-chat-gateway/packages/api-contract"
   },
   "devDependencies": {
     "tsup": "^8.5.1",

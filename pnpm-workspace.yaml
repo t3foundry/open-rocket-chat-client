@@ -6,7 +6,7 @@ packages:
 # published to npm, resolve them from a sibling checkout so both repos can be
 # developed together. See CONTRIBUTING.md.
 overrides:
-  '@open-rocket-chat/api-contract': link:../open-rocket-chat-gateway/packages/api-contract
+  '@t3foundry/open-rocket-chat-api-contract': link:../open-rocket-chat-gateway/packages/api-contract
 
 allowBuilds:
   esbuild: true

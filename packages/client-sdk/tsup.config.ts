@@ -8,5 +8,5 @@ export default defineConfig({
   clean: true,
   treeshake: true,
   target: 'es2023',
-  external: ['@open-rocket-chat/api-contract'],
+  external: ['@t3foundry/open-rocket-chat-api-contract'],
 });

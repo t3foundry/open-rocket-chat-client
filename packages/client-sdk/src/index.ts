@@ -10,10 +10,10 @@ export type { RealtimeOptions, RealtimeStatus, RealtimeStatusInfo, Unsubscribe }
 export { GatewayError, NetworkError } from './errors.js';
 
 // Re-exported so applications depend on one package rather than two.
-export type * from '@open-rocket-chat/api-contract';
+export type * from '@t3foundry/open-rocket-chat-api-contract';
 
 // The contract's limits, for forms that have to enforce them before sending.
-export { STATUS_TEXT_MAX_LENGTH } from '@open-rocket-chat/api-contract';
+export { STATUS_TEXT_MAX_LENGTH } from '@t3foundry/open-rocket-chat-api-contract';
 
 // What an avatar may be, so a picker can reject a file before uploading it.
-export { AVATAR_ACCEPT, isAvatarMediaType } from '@open-rocket-chat/api-contract';
+export { AVATAR_ACCEPT, isAvatarMediaType } from '@t3foundry/open-rocket-chat-api-contract';

@@ -155,7 +155,7 @@ pnpm --filter @open-rocket-chat/web dev          # http://localhost:5173
 
 `admin` / `admin-password-123` でサインインできます。Docker Compose の起動時に作成される初期アカウントです。
 
-ふたつのリポジトリは並行して開発されています。このリポジトリは pnpm の `link:` 設定を使い、隣に置かれた gateway リポジトリから `@open-rocket-chat/api-contract` を読み込みます。パッケージが npm に公開されるまでは、両方のリポジトリを同じ親ディレクトリに配置してください。詳しくは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+ふたつのリポジトリは並行して開発されています。このリポジトリは pnpm の `link:` 設定を使い、隣に置かれた gateway リポジトリから `@t3foundry/open-rocket-chat-api-contract` を読み込みます。パッケージが npm に公開されるまでは、両方のリポジトリを同じ親ディレクトリに配置してください。詳しくは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
 
 ### GIF 検索
 

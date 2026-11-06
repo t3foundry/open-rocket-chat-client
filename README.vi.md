@@ -155,7 +155,7 @@ pnpm --filter @open-rocket-chat/web dev          # http://localhost:5173
 
 Đăng nhập bằng `admin` / `admin-password-123` — tài khoản mà file Compose tạo sẵn.
 
-Hai repository được phát triển song song. Thông qua cấu hình `link:` của pnpm, repo này lấy `@open-rocket-chat/api-contract` từ bản checkout nằm bên cạnh. Vì vậy, cho đến khi các package được phát hành lên npm, bạn cần đặt cả hai repo trong cùng một thư mục cha. Xem [CONTRIBUTING.md](CONTRIBUTING.md).
+Hai repository được phát triển song song. Thông qua cấu hình `link:` của pnpm, repo này lấy `@t3foundry/open-rocket-chat-api-contract` từ bản checkout nằm bên cạnh. Vì vậy, cho đến khi các package được phát hành lên npm, bạn cần đặt cả hai repo trong cùng một thư mục cha. Xem [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Tìm kiếm GIF
 

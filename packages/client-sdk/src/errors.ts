@@ -1,4 +1,4 @@
-import type { ApiError, ErrorCode } from '@open-rocket-chat/api-contract';
+import type { ApiError, ErrorCode } from '@t3foundry/open-rocket-chat-api-contract';
 
 /**
  * Every failed gateway call surfaces as one of these. The gateway guarantees a

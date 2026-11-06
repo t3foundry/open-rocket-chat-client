@@ -7,7 +7,7 @@ Thanks for helping out.
 This repository is developed alongside
 [open-rocket-chat-gateway](https://github.com/t3foundry/rocket-chat-gateway), which owns the shared
 API contract. Until those packages are published to npm, this one resolves
-`@open-rocket-chat/api-contract` through a pnpm `link:` override pointing at a sibling checkout, so the two
+`@t3foundry/open-rocket-chat-api-contract` through a pnpm `link:` override pointing at a sibling checkout, so the two
 must share a parent directory:
 
 ```
@@ -27,7 +27,7 @@ pnpm install
 pnpm --filter @open-rocket-chat/web dev
 ```
 
-If `@open-rocket-chat/api-contract` cannot be resolved, the sibling checkout is missing or has not been built —
+If `@t3foundry/open-rocket-chat-api-contract` cannot be resolved, the sibling checkout is missing or has not been built —
 run `pnpm run build` in the gateway repository first.
 
 ## Branching model

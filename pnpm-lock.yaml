@@ -163,7 +163,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@open-rocket-chat/api-contract': link:../open-rocket-chat-gateway/packages/api-contract
+  '@t3foundry/open-rocket-chat-api-contract': link:../open-rocket-chat-gateway/packages/api-contract
 
 importers:
 
@@ -341,7 +341,7 @@ importers:
 
   packages/client-sdk:
     dependencies:
-      '@open-rocket-chat/api-contract':
+      '@t3foundry/open-rocket-chat-api-contract':
         specifier: link:../../../open-rocket-chat-gateway/packages/api-contract
         version: link:../../../open-rocket-chat-gateway/packages/api-contract
     devDependencies:

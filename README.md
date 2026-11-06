@@ -155,7 +155,7 @@ pnpm --filter @open-rocket-chat/web dev          # http://localhost:5173
 
 Sign in with `admin` / `admin-password-123` — the credentials the Compose file seeds.
 
-The two repositories are developed side by side. This one resolves `@open-rocket-chat/api-contract` from a sibling checkout via a pnpm `link:` override, so both must sit in the same parent directory until the packages are published to npm. See [CONTRIBUTING.md](CONTRIBUTING.md).
+The two repositories are developed side by side. This one resolves `@t3foundry/open-rocket-chat-api-contract` from a sibling checkout via a pnpm `link:` override, so both must sit in the same parent directory until the packages are published to npm. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### GIF search
 

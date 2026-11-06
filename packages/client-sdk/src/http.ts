@@ -1,4 +1,4 @@
-import { API_BASE_PATH, SERVER_ID_HEADER } from '@open-rocket-chat/api-contract';
+import { API_BASE_PATH, SERVER_ID_HEADER } from '@t3foundry/open-rocket-chat-api-contract';
 
 import { GatewayError, NetworkError } from './errors.js';
 
