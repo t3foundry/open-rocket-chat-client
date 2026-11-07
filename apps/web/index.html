@@ -25,6 +25,9 @@
   </head>
   <body class="h-full">
     <div id="root" class="h-full"></div>
+    <!-- Runtime configuration injected by the container entrypoint.  Must load
+         before the app bundle so `window.__GATEWAY_URL__` is available. -->
+    <script src="/env.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

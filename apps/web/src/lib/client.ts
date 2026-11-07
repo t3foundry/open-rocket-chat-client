@@ -3,11 +3,16 @@ import i18next from 'i18next';
 
 /**
  * In development the Vite dev server proxies `/api` and `/ws`, so the gateway
- * is same-origin and the session cookie needs no cross-site configuration. A
- * production build points straight at the gateway.
+ * is same-origin and the session cookie needs no cross-site configuration.
+ *
+ * In production the order of precedence is:
+ * 1. `window.__GATEWAY_URL__` — injected at container start by the entrypoint
+ *    (set `GATEWAY_URL` as a container env var).
+ * 2. `import.meta.env.VITE_GATEWAY_URL` — baked in at build time.
+ * 3. `window.location.origin` — same-origin fallback.
  */
 const gatewayOrigin = import.meta.env.PROD
-  ? (import.meta.env.VITE_GATEWAY_URL ?? window.location.origin)
+  ? (window.__GATEWAY_URL__ ?? import.meta.env.VITE_GATEWAY_URL ?? window.location.origin)
   : window.location.origin;
 
 export const client = new OpenRocketChatClient({
