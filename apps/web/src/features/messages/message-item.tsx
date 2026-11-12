@@ -270,6 +270,33 @@ export const MessageItem = ({
     [fileRecord, tasraSlot, tasraSession],
   );
 
+  // Auto-decrypt encrypted files as soon as they appear. This mirrors
+  // `useAutoDecryptTasra` for messages: the file is fetched from the gateway,
+  // decrypted via threshold BLS + AES-GCM, and rendered inline without the
+  // user having to click anything.
+  //
+  // Deferred through setTimeout(0) to avoid the react-hooks/set-state-in-effect
+  // lint rule: the decrypt function calls setFileDecryptState, which React
+  // flags when invoked synchronously inside an effect body.
+  useEffect(() => {
+    if (!isEncryptedFile || !tasraSlot || !tasraSession) return;
+    if (fileDecryptState.status !== 'idle') return;
+
+    const file = message.files[0];
+    if (!file) return;
+
+    const url = client.mediaUrl(file.url);
+    const name = file.name;
+    const size = file.size;
+
+    const timer = setTimeout(() => {
+      void handleDecryptFile(url, name, size);
+    }, 0);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEncryptedFile, tasraSlot, tasraSession, message.files, fileDecryptState.status]);
+
   // Clean up blob URL on unmount.
   useEffect(
     () => () => {
@@ -286,19 +313,38 @@ export const MessageItem = ({
 
   /** Every attachment on this row, so the lightbox can page through them. */
   const mediaItems: MediaItem[] = useMemo(
-    () =>
-      messages.flatMap((entry) =>
-        entry.files.map((file) => ({
-          id: file.id,
-          url: client.mediaUrl(file.url),
-          thumbnailUrl: file.thumbnailUrl ? client.mediaUrl(file.thumbnailUrl) : null,
-          name: file.name,
-          mimeType: file.mimeType,
-          kind: mediaKindOf(file.mimeType, file.name),
-          sizeBytes: file.size,
-        })),
-      ),
-    [client, messages],
+    () => {
+      // When an encrypted file has been decrypted, substitute the blob URL and
+      // the original filename so images/videos render inline instead of
+      // appearing as nameless documents.
+      const isDecrypted = isEncryptedFile && fileDecryptState.status === 'decrypted';
+
+      return messages.flatMap((entry) =>
+        entry.files.map((file) => {
+          if (isDecrypted && fileDecryptState.status === 'decrypted') {
+            return {
+              id: file.id,
+              url: fileDecryptState.blobUrl,
+              name: fileDecryptState.fileName,
+              mimeType: null,
+              kind: mediaKindOf(null, fileDecryptState.fileName),
+              sizeBytes: fileDecryptState.sizeBytes,
+            };
+          }
+
+          return {
+            id: file.id,
+            url: client.mediaUrl(file.url),
+            thumbnailUrl: file.thumbnailUrl ? client.mediaUrl(file.thumbnailUrl) : null,
+            name: file.name,
+            mimeType: file.mimeType,
+            kind: mediaKindOf(file.mimeType, file.name),
+            sizeBytes: file.size,
+          };
+        }),
+      );
+    },
+    [client, messages, isEncryptedFile, fileDecryptState],
   );
 
   // Images and video are laid out as a grid of square crops; documents get a
@@ -335,8 +381,12 @@ export const MessageItem = ({
   }
 
   // A bubble with nothing in it would be an empty box floating next to the
-  // attachment it was meant to caption.
-  const hasBody = message.encrypted || message.text.trim().length > 0;
+  // attachment it was meant to caption. Encrypted files that have already been
+  // decrypted render their content inline as previews, so the body label is
+  // redundant — skip it to avoid a floating empty bubble.
+  const isDecryptedFile = isEncryptedFile && fileDecryptState.status === 'decrypted';
+  const hasBody =
+    (message.encrypted && !isDecryptedFile) || (message.text.trim().length > 0 && !isDecryptedFile);
 
   // A message that is only a quote or only a code block is drawn by that block
   // alone — the bubble around it would be a frame around a frame.
@@ -437,10 +487,27 @@ export const MessageItem = ({
               )}
             >
               {isEncryptedFile ? (
-                <p className="text-content-muted flex items-center gap-1.5 italic">
-                  <Icons.private size={14} />
-                  {t('tasra.encryptedFile')}
-                </p>
+                fileDecryptState.status === 'loading' ? (
+                  <p className="text-content-muted italic">{t('tasra.decrypting')}</p>
+                ) : fileDecryptState.status === 'error' ? (
+                  <div className="flex flex-col gap-1">
+                    <p className="text-content-muted flex items-center gap-1.5 italic">
+                      <Icons.private size={14} />
+                      {t('tasra.encryptedFile')}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const file = message.files[0];
+                        if (file) void handleDecryptFile(client.mediaUrl(file.url), file.name, file.size);
+                      }}
+                      className="text-content-muted hover:text-content flex items-center gap-1 text-xs italic transition-colors"
+                    >
+                      <Icons.private size={12} />
+                      {t('tasra.retry')}
+                    </button>
+                  </div>
+                ) : null
               ) : isTasraBody ? (
                 cachedPlaintext || decryptState.status === 'decrypted' ? (
                   <MessageBody
