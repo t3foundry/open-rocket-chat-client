@@ -13,5 +13,6 @@ export type { ApplyThemeOptions, ColorSchemePreference } from './apply.js';
 
 export { ThemeRegistry, createThemeRegistry, builtInThemes } from './registry.js';
 
-export { defaultTheme } from './themes/default.js';
+export { warmAmberTheme } from './themes/default.js';
 export { nordSlateTheme } from './themes/nord-slate.js';
+export { defaultTheme } from './themes/t3foundry.js';

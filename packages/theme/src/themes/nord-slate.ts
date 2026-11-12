@@ -1,5 +1,5 @@
 import { extendTheme } from '../contract.js';
-import { defaultTheme } from './default.js';
+import { warmAmberTheme } from './default.js';
 
 /**
  * A worked example of a community theme.
@@ -8,7 +8,7 @@ import { defaultTheme } from './default.js';
  * themes should follow: `extendTheme` keeps them working when the contract
  * gains tokens, whereas a hand-copied theme would fail validation on upgrade.
  */
-export const nordSlateTheme = extendTheme(defaultTheme, {
+export const nordSlateTheme = extendTheme(warmAmberTheme, {
   id: 'nord-slate',
   name: 'Nord Slate',
   description: 'Cool blue-greys with a muted indigo accent.',

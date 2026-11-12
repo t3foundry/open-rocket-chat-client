@@ -1,14 +1,15 @@
 import { parseTheme, type Theme } from '../contract.js';
 
 /**
- * The theme shipped out of the box: warm neutrals with an amber accent.
+ * Warm neutrals with an amber accent. The original default theme, kept as a
+ * secondary option now that T3Foundry blue is the primary brand theme.
  *
  * Use this as the starting point for a community theme — `extendTheme` lets you
  * override a handful of tokens without restating the rest.
  */
-export const defaultTheme: Theme = parseTheme({
-  id: 'default',
-  name: 'Default',
+export const warmAmberTheme: Theme = parseTheme({
+  id: 'warm-amber',
+  name: 'Warm Amber',
   description: 'Warm neutrals with an amber accent.',
   author: 'Open Rocket.Chat',
 

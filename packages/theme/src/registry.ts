@@ -1,6 +1,7 @@
 import { parseTheme, type Theme } from './contract.js';
-import { defaultTheme } from './themes/default.js';
+import { warmAmberTheme } from './themes/default.js';
 import { nordSlateTheme } from './themes/nord-slate.js';
+import { defaultTheme } from './themes/t3foundry.js';
 
 /**
  * The set of themes the running app can offer.
@@ -55,7 +56,7 @@ export class ThemeRegistry {
 }
 
 /** Themes bundled with the app. */
-export const builtInThemes: Theme[] = [defaultTheme, nordSlateTheme];
+export const builtInThemes: Theme[] = [defaultTheme, warmAmberTheme, nordSlateTheme];
 
 export const createThemeRegistry = (extra: Theme[] = []): ThemeRegistry =>
   new ThemeRegistry([...builtInThemes, ...extra]);

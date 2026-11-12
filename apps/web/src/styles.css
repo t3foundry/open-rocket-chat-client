@@ -280,3 +280,65 @@
     background: transparent;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* T3Foundry brand customizations                                     */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Brand selection colours: light-cyan highlight with dark-navy text.
+ * Unlayered so this always wins over the layered fallback in @layer base.
+ */
+::selection {
+  background-color: #5cc8ff;
+  color: #102a83;
+}
+
+/*
+ * Sidebar scrollbar with brand-appropriate, subtle styling.
+ * Slightly narrower than the general-purpose scrollbar-slim.
+ */
+.scrollbar-t3f {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+.scrollbar-t3f::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-t3f::-webkit-scrollbar-thumb {
+  background-color: var(--color-line-strong);
+  border-radius: 9999px;
+}
+
+.scrollbar-t3f::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Subtle page-transition animations for content areas. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fully rounded pill shape — matching the brand's navigation buttons. */
+@utility rounded-pill {
+  border-radius: 9999px;
+}

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { toCssVariables } from '../apply.js';
 import { extendTheme, InvalidThemeError, parseTheme, ThemeTokensSchema } from '../contract.js';
 import { createThemeRegistry } from '../registry.js';
-import { defaultTheme } from '../themes/default.js';
+import { defaultTheme } from '../themes/t3foundry.js';
 import { nordSlateTheme } from '../themes/nord-slate.js';
 
 describe('the contract', () => {
@@ -97,9 +97,9 @@ describe('css variables', () => {
   it('namespaces and flattens every token', () => {
     const variables = toCssVariables(defaultTheme.light.tokens);
 
-    expect(variables['--orc-surface-app']).toBe('#ffffff');
-    expect(variables['--orc-accent-base']).toBe('#c2762b');
-    expect(variables['--orc-radius-lg']).toBe('14px');
+    expect(variables['--orc-surface-app']).toBe('#F8FAFD');
+    expect(variables['--orc-accent-base']).toBe('#1F5EFF');
+    expect(variables['--orc-radius-lg']).toBe('10px');
   });
 
   it('emits a variable for every token in the contract', () => {
