@@ -52,7 +52,7 @@ export function parseTasraSlot(description: string | null | undefined): `0x${str
 }
 
 /**
- * Whether `text` is a serialized `tasra-encrypt/v2` record.
+ * Whether `text` is a serialized `tasra-encrypt/v2` record of any kind.
  *
  * Cheap, JSON-shape-only: the body must open with `{` (a trim of leading
  * whitespace is tolerated) and its `manifest.schema` must be the encrypted
@@ -67,5 +67,40 @@ export function looksEncrypted(text: string): boolean {
     return manifest?.schema === 'tasra-encrypt/v2';
   } catch {
     return false;
+  }
+}
+
+/**
+ * Whether `text` is an encrypted **file** record — a `tasra-encrypt/v2` record
+ * whose `manifest.title` is `"file"`.
+ *
+ * File records carry their ciphertext as the uploaded file blob rather than as
+ * a base64 field inside the JSON envelope, so the rendering and decryption path
+ * differ from an encrypted message.
+ */
+export function isEncryptedFileRecord(text: string): boolean {
+  if (!looksEncrypted(text)) return false;
+
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return (parsed as { manifest?: { title?: string } } | null)?.manifest?.title === 'file';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Parses an encrypted file record from the message text into its metadata.
+ *
+ * Returns `null` when `text` does not carry a file record, which is the case
+ * for both plaintext messages and `tasra-encrypt/v2` message records.
+ */
+export function parseEncryptedFileRecord(text: string): EncryptedRecord | null {
+  if (!isEncryptedFileRecord(text)) return null;
+
+  try {
+    return JSON.parse(text) as EncryptedRecord;
+  } catch {
+    return null;
   }
 }

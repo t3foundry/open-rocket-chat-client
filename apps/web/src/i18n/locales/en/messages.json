@@ -133,7 +133,10 @@
   "tasra": {
     "encrypted": "Encrypted message — click to decrypt",
     "decrypting": "Decrypting…",
-    "cannotDecrypt": "Cannot decrypt this message"
+    "cannotDecrypt": "Cannot decrypt this message",
+    "retry": "Retry",
+    "encryptedFile": "Encrypted file — click to decrypt below",
+    "clickToDecrypt": "Click to decrypt and download"
   },
   "attachments_one": "{{count}} attachment",
   "attachments_other": "{{count}} attachments"

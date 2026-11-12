@@ -1,18 +1,15 @@
 import type { Message } from '@open-rocket-chat/client-sdk';
-import { credentialAuthorization } from '@t3foundry/tasra-sdk/app';
 import { format } from 'date-fns';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { fileIconOf } from '@/features/media/file-icon';
 import { isPreviewable, mediaKindOf, useMediaStore, type MediaItem } from '@/features/media/media';
 import { UserCard } from '@/features/rooms/user-card';
 import { useClient } from '@/features/servers/server-scope';
-import { sha256, toHex, unb64, validateEnvelope, SCHEMA } from '@/features/tasra/crypto';
+import { decryptMessage, decryptFile } from '@/features/tasra/crypto';
 import { decryptedCache } from '@/features/tasra/decrypt-cache';
-import { getVerifierAgentUrl } from '@/features/tasra/deployment';
-import { looksEncrypted, type EncryptedRecord } from '@/features/tasra/detect';
-import { getTasraApplication } from '@/features/tasra/tasra-application';
+import { looksEncrypted, isEncryptedFileRecord, parseEncryptedFileRecord, type EncryptedRecord } from '@/features/tasra/detect';
 import { useTasraSession } from '@/features/tasra/tasra-provider';
 import { copyText } from '@/lib/clipboard';
 import { cn } from '@/lib/cn';
@@ -28,25 +25,6 @@ import { MessageBody } from './message-body';
 import { mergeReactions } from './message-rows';
 import { PinnedQuote } from './pinned-quote';
 import { isPinnedQuoteEncrypted, pinnedQuoteOf, systemMessageLabel } from './system-message';
-
-/**
- * Decodes the `iss` claim out of a compact SD-JWT, without pulling in the SDK's
- * parser. A failed decrypt reports which issuer minted the credential, since the
- * verifier's refusal ("creator authorisation", "rule fetch") is almost always a
- * mismatch between what the slot policy expects and what the client presents.
- */
-const sdJwtIssuer = (credential: string): string | undefined => {
-  try {
-    const payload = credential.split('~')[0]?.split('.')[1];
-    if (!payload) return undefined;
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
-    const json = new TextDecoder().decode(Uint8Array.from(atob(padded), (c) => c.charCodeAt(0)));
-    return (JSON.parse(json) as { iss?: string }).iss;
-  } catch {
-    return undefined;
-  }
-};
 
 /**
  * What the server lets this user do to this message, resolved once by the list
@@ -163,7 +141,9 @@ export const MessageItem = ({
 
   // Tasra encrypted-message detection and decryption.
   const tasraSession = useTasraSession();
-  const isTasraBody = useMemo(() => looksEncrypted(message.text), [message.text]);
+  const isEncryptedFile = useMemo(() => isEncryptedFileRecord(message.text), [message.text]);
+  const fileRecord = useMemo(() => parseEncryptedFileRecord(message.text), [message.text]);
+  const isTasraBody = useMemo(() => looksEncrypted(message.text) && !isEncryptedFile, [message.text, isEncryptedFile]);
   const tasraRecord = useMemo((): EncryptedRecord | null => {
     if (!isTasraBody) return null;
     try {
@@ -181,132 +161,46 @@ export const MessageItem = ({
 
   const [decryptState, setDecryptState] = useState<DecryptState>({ status: 'idle' });
 
-  // Check cache on mount and when the record changes.
-  const cachedPlaintext = useMemo(() => {
-    if (!tasraRecord) return null;
-    const cached = decryptedCache.get(tasraRecord.manifest.recordId);
-    if (cached && cached.version >= tasraRecord.manifest.version) {
-      return cached.text;
-    }
-    return null;
-  }, [tasraRecord]);
+  // Subscribe to cache changes so auto-decrypted text appears without a click.
+  // `useSyncExternalStore` re-renders the component whenever the cache writes
+  // an entry for this message's record id.
+  const cachedPlaintext = useSyncExternalStore(
+    decryptedCache.subscribe,
+    () => {
+      if (!tasraRecord) return null;
+      const cached = decryptedCache.get(tasraRecord.manifest.recordId);
+      if (cached && cached.version >= tasraRecord.manifest.version) {
+        return cached.text;
+      }
+      return null;
+    },
+    () => null, // SSR snapshot — not applicable.
+  );
 
   const handleDecrypt = useCallback(async () => {
     if (!tasraRecord || !tasraSlot) return;
 
     setDecryptState({ status: 'loading' });
 
-    // Kept in the enclosing scope so a failed decrypt can report it: the
-    // verifier's refusal is almost always a credential/signer/issuer mismatch,
-    // and printing what was actually presented is the fastest way to see which.
-    let credential: string | undefined;
-
     try {
-      const totalStart = performance.now();
-
-      // Validate the envelope against the channel's slot.
-      let stepStart = performance.now();
-      const envelope = validateEnvelope(tasraRecord, tasraSlot);
-      console.log(`[tasra:timing] envelope validation: ${(performance.now() - stepStart).toFixed(1)}ms`);
-
-      // Obtain the holder credential for this slot.
-      stepStart = performance.now();
-      credential = await tasraSession.getCredential(tasraSlot);
-      console.log(`[tasra:timing] getCredential (issue or cache hit): ${(performance.now() - stepStart).toFixed(1)}ms`);
-
-      // Build the committee-custody authorizer.
-      stepStart = performance.now();
-      const authorize = credentialAuthorization({
-        verifierAgentUrl: getVerifierAgentUrl(),
+      const text = await decryptMessage(tasraRecord, tasraSlot, {
+        getCredential: tasraSession.getCredential,
         signer: tasraSession.signer,
         identity: tasraSession.identity,
-        credentials: [credential],
       });
-      console.log(`[tasra:timing] credentialAuthorization: ${(performance.now() - stepStart).toFixed(1)}ms`);
 
-      // Unwrap the data key via threshold BLS decrypt.
-      // The SDK calls authorize() inside slot.decrypt() for OID4VP, then
-      // sends the compound token to the keeper for BLS threshold decrypt.
-      // Wrap the authorizer to split the timing of these two phases.
-      let oid4vpStart = 0;
-      let oid4vpEnd = 0;
-      const timedAuthorize = async (request: Parameters<typeof authorize>[0]) => {
-        oid4vpStart = performance.now();
-        const grant = await authorize(request);
-        oid4vpEnd = performance.now();
-        return grant;
-      };
-
-      stepStart = performance.now();
-      const slot = await getTasraApplication().slots.bls(tasraRecord.manifest.slotId);
-      console.log(`[tasra:timing] slots.bls (get slot handle): ${(performance.now() - stepStart).toFixed(1)}ms`);
-
-      stepStart = performance.now();
-      const { plaintext: dataKeyRaw } = await slot.decrypt(envelope.identity, envelope.ciphertext, {
-        authorize: timedAuthorize,
-        requireReceipts: true,
-        description: 'Decrypt a channel message',
+      decryptedCache.set(tasraRecord.manifest.recordId, {
+        text,
+        version: tasraRecord.manifest.version,
       });
-      const committeeEnd = performance.now();
-      console.log(`[tasra:timing]   └ OID4VP (verifier agent + credential presentation + token): ${(oid4vpEnd - oid4vpStart).toFixed(1)}ms`);
-      console.log(`[tasra:timing]   └ BLS keeper threshold decrypt: ${(committeeEnd - oid4vpEnd).toFixed(1)}ms`);
-      console.log(`[tasra:timing] slot.decrypt total: ${(committeeEnd - stepStart).toFixed(1)}ms`);
-      // `dataKeyRaw` is Uint8Array<ArrayBufferLike>; copy to a plain
-      // Uint8Array<ArrayBuffer> so WebCrypto accepts it as BufferSource.
-      stepStart = performance.now();
-      const dataKey = new Uint8Array(dataKeyRaw);
-      console.log(`[tasra:timing] dataKey copy: ${(performance.now() - stepStart).toFixed(1)}ms`);
-      try {
-        // AES-GCM decrypt the message body.
-        stepStart = performance.now();
-        const aesCiphertext = unb64(tasraRecord.envelope.aesCiphertext);
-        const iv = aesCiphertext.subarray(0, 12);
-        const ciphertext = aesCiphertext.subarray(12) as BufferSource;
 
-        const aad = await sha256(new TextEncoder().encode(`${SCHEMA}:${tasraRecord.manifest.recordId}`));
-        const aesKey = await crypto.subtle.importKey('raw', dataKey, { name: 'AES-GCM' }, false, ['decrypt']);
-        const plainBytes = new Uint8Array(
-          await crypto.subtle.decrypt(
-            { name: 'AES-GCM', iv: iv as BufferSource, additionalData: aad },
-            aesKey,
-            ciphertext,
-          ),
-        );
-        console.log(`[tasra:timing] AES-GCM decrypt (sha256 aad + importKey + decrypt): ${(performance.now() - stepStart).toFixed(1)}ms`);
-
-        // Verify the document hash.
-        stepStart = performance.now();
-        const computedHash = toHex(await sha256(plainBytes));
-        if (computedHash !== tasraRecord.manifest.documentSha256) {
-          throw new Error('document hash mismatch');
-        }
-        console.log(`[tasra:timing] document hash verify (sha256 + hex): ${(performance.now() - stepStart).toFixed(1)}ms`);
-        const text = new TextDecoder().decode(plainBytes);
-
-        // Cache and render.
-        stepStart = performance.now();
-        decryptedCache.set(tasraRecord.manifest.recordId, {
-          text,
-          version: tasraRecord.manifest.version,
-        });
-
-        setDecryptState({ status: 'decrypted', text });
-        console.log(`[tasra:timing] cache set + react render: ${(performance.now() - stepStart).toFixed(1)}ms`);
-
-        console.log(`[tasra:timing] TOTAL decrypt: ${(performance.now() - totalStart).toFixed(1)}ms`);
-      } finally {
-        // Per spec §9 step 6: zeroize the data key after use.
-        dataKey.fill(0);
-      }
+      setDecryptState({ status: 'decrypted', text });
     } catch (decryptError) {
       // The reason is surfaced here (not just swallowed) because every failure
       // mode in the spec maps to "cannot decrypt" but each has a distinct cause
       // worth diagnosing — a refused credential, an unreachable verifier agent,
       // an envelope invariant failure, an AES-GCM auth failure, and so on.
       console.error('[tasra] decrypt failed:', decryptError);
-      if (credential) {
-        console.error('[tasra] reader credential (issuer:', sdJwtIssuer(credential), '):', credential);
-      }
       console.error('[tasra] operation signer address:', tasraSession.signer.address);
       console.error('[tasra] holder DID:', tasraSession.identity.did);
       setDecryptState({
@@ -315,6 +209,74 @@ export const MessageItem = ({
       });
     }
   }, [tasraRecord, tasraSlot, tasraSession]);
+
+  // Encrypted file decryption.
+  type FileDecryptState =
+    | { status: 'idle' }
+    | { status: 'loading' }
+    | { status: 'decrypted'; blobUrl: string; fileName: string; sizeBytes: number | null }
+    | { status: 'error'; error: string };
+
+  const [fileDecryptState, setFileDecryptState] = useState<FileDecryptState>({ status: 'idle' });
+  // Track which file entry was decrypted so the state stays scoped.
+  const fileDecryptTarget = useRef<string | null>(null);
+
+  // Hold the latest decrypted blob URL in a ref so the cleanup effect can
+  // revoke it without depending on the state itself.
+  const blobUrlRef = useRef<string | null>(null);
+
+  const handleDecryptFile = useCallback(
+    async (fileUrl: string, fileName: string, fileSize: number | null) => {
+      if (!fileRecord || !tasraSlot || !tasraSession) return;
+
+      fileDecryptTarget.current = fileUrl;
+      setFileDecryptState({ status: 'loading' });
+
+      try {
+        // Fetch the encrypted blob from the gateway.
+        const response = await fetch(fileUrl);
+        if (!response.ok) throw new Error(`Failed to fetch file: ${response.status}`);
+        const encryptedBlob = new Uint8Array(await response.arrayBuffer());
+
+        // Decrypt.
+        const plainBytes = await decryptFile(fileRecord, encryptedBlob, tasraSlot, {
+          getCredential: tasraSession.getCredential,
+          signer: tasraSession.signer,
+          identity: tasraSession.identity,
+        });
+
+        // Create a blob URL for download. The blob is eligible for garbage
+        // collection once the URL is revoked (on unmount or re-decrypt).
+        const blob = new Blob([new Uint8Array(plainBytes)], { type: 'application/octet-stream' });
+        const blobUrl = URL.createObjectURL(blob);
+
+        // Revoke any previous blob URL before storing the new one.
+        if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = blobUrl;
+
+        // Strip the .tasra extension so the downloaded file carries its
+        // original name.
+        const originalName = fileName.endsWith('.tasra') ? fileName.slice(0, -'.tasra'.length) : fileName;
+
+        setFileDecryptState({ status: 'decrypted', blobUrl, fileName: originalName, sizeBytes: fileSize });
+      } catch (err) {
+        console.error('[tasra] file decrypt failed:', err);
+        setFileDecryptState({
+          status: 'error',
+          error: err instanceof Error ? err.message : 'Unknown error',
+        });
+      }
+    },
+    [fileRecord, tasraSlot, tasraSession],
+  );
+
+  // Clean up blob URL on unmount.
+  useEffect(
+    () => () => {
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!copied) return;
@@ -474,7 +436,12 @@ export const MessageItem = ({
                     ),
               )}
             >
-              {isTasraBody ? (
+              {isEncryptedFile ? (
+                <p className="text-content-muted flex items-center gap-1.5 italic">
+                  <Icons.private size={14} />
+                  {t('tasra.encryptedFile')}
+                </p>
+              ) : isTasraBody ? (
                 cachedPlaintext || decryptState.status === 'decrypted' ? (
                   <MessageBody
                     text={cachedPlaintext ?? (decryptState as { status: 'decrypted'; text: string }).text}
@@ -485,19 +452,25 @@ export const MessageItem = ({
                 ) : decryptState.status === 'loading' ? (
                   <p className="text-content-muted italic">{t('tasra.decrypting')}</p>
                 ) : decryptState.status === 'error' ? (
-                  <p className="text-content-muted italic">
-                    {t('tasra.cannotDecrypt')}
-                    {decryptState.error ? ` — ${decryptState.error}` : ''}
-                  </p>
+                  <div className="flex flex-col gap-1">
+                    <p className="text-content-muted italic">
+                      {t('tasra.cannotDecrypt')}
+                      {decryptState.error ? ` — ${decryptState.error}` : ''}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void handleDecrypt()}
+                      className="text-content-muted hover:text-content flex items-center gap-1 text-xs italic transition-colors"
+                    >
+                      <Icons.private size={12} />
+                      {t('tasra.retry')}
+                    </button>
+                  </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => void handleDecrypt()}
-                    className="text-content-muted hover:text-content flex items-center gap-1.5 text-left text-sm italic transition-colors"
-                  >
+                  <p className="text-content-muted flex items-center gap-1.5 italic">
                     <Icons.private size={14} />
-                    {t('tasra.encrypted')}
-                  </button>
+                    {t('tasra.decrypting')}
+                  </p>
                 )
               ) : message.encrypted ? (
                 <p className="text-content-muted italic">{t('encrypted')}</p>
@@ -587,6 +560,10 @@ export const MessageItem = ({
             //
             // A lone file keeps the full-width row: it has the space for its
             // name, and a half-width card would only strand it beside a gap.
+            //
+            // Encrypted files (in a tasra-encrypt/v2 channel) are rendered as
+            // click-to-decrypt cards; their encrypted blob is not a useful
+            // download until the client unwraps it.
             <ul
               aria-label={asFileGrid ? t('attachments', { count: documents.length }) : undefined}
               className={cn(
@@ -597,6 +574,127 @@ export const MessageItem = ({
               )}
             >
               {documents.map((item) => {
+                if (isEncryptedFile) {
+                  // Strip the .tasra extension for display.
+                  const displayName = item.name.endsWith('.tasra') ? item.name.slice(0, -'.tasra'.length) : item.name;
+                  const isDecrypting = fileDecryptState.status === 'loading';
+                  const isDone = fileDecryptState.status === 'decrypted';
+                  const isError = fileDecryptState.status === 'error';
+
+                  return (
+                    <li key={item.id} className="min-w-0">
+                      {/* An encrypted file card is interactive (click to decrypt)
+                          rather than a plain download link, so it is a button
+                          when idle and an anchor once decrypted. */}
+                      {isDone ? (
+                        <a
+                          href={fileDecryptState.blobUrl}
+                          download={fileDecryptState.fileName}
+                          title={fileDecryptState.fileName}
+                          className={cn(
+                            'border-line bg-app hover:bg-sunken rounded-lg border transition-colors',
+                            asFileGrid
+                              ? 'flex h-full flex-col gap-1.5 p-2.5'
+                              : 'flex items-center gap-2.5 px-3 py-2',
+                          )}
+                        >
+                          <span
+                            className={cn('text-content-muted', asFileGrid && 'flex items-center justify-between')}
+                          >
+                            {(() => {
+                              const DecIcon = Icons[fileIconOf(item.mimeType, displayName)];
+                              return <DecIcon size={20} />;
+                            })()}
+                            {asFileGrid ? <Icons.download size={14} /> : null}
+                          </span>
+                          <span className="min-w-0">
+                            <span
+                              className={cn(
+                                'block text-xs font-medium',
+                                asFileGrid ? 'line-clamp-2 break-all' : 'truncate',
+                              )}
+                            >
+                              {fileDecryptState.fileName}
+                            </span>
+                            {fileDecryptState.sizeBytes ? (
+                              <span className="text-content-muted block text-[11px]">
+                                {formatBytes(fileDecryptState.sizeBytes)}
+                              </span>
+                            ) : null}
+                          </span>
+                          {asFileGrid ? null : (
+                            <span className="text-content-muted ml-2">
+                              <Icons.download size={16} />
+                            </span>
+                          )}
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={isDecrypting}
+                          onClick={() => void handleDecryptFile(item.url, item.name, item.sizeBytes ?? null)}
+                          title={displayName}
+                          className={cn(
+                            'border-line bg-app hover:bg-sunken rounded-lg border transition-colors text-left',
+                            isDecrypting && 'cursor-wait opacity-70',
+                            asFileGrid
+                              ? 'flex h-full flex-col gap-1.5 p-2.5'
+                              : 'flex items-center gap-2.5 px-3 py-2',
+                          )}
+                        >
+                          <span
+                            className={cn('text-content-muted', asFileGrid && 'flex items-center justify-between')}
+                          >
+                            <Icons.private size={20} />
+                            {asFileGrid && !isDecrypting ? (
+                              <Icons.private size={14} className="text-accent" />
+                            ) : null}
+                          </span>
+                          <span className="min-w-0">
+                            <span
+                              className={cn(
+                                'block text-xs font-medium',
+                                asFileGrid ? 'line-clamp-2 break-all' : 'truncate',
+                              )}
+                            >
+                              {displayName}
+                            </span>
+                            {isDecrypting ? (
+                              <span className="text-content-muted block text-[11px] italic">
+                                {t('tasra.decrypting')}
+                              </span>
+                            ) : isError ? (
+                              <span className="text-danger block text-[11px]">
+                                {t('tasra.cannotDecrypt')}
+                              </span>
+                            ) : (
+                              <>
+                                {item.sizeBytes ? (
+                                  <span className="text-content-muted block text-[11px]">
+                                    {formatBytes(item.sizeBytes)}
+                                  </span>
+                                ) : null}
+                                <span className="text-accent block text-[11px] font-medium">
+                                  {t('tasra.clickToDecrypt')}
+                                </span>
+                              </>
+                            )}
+                          </span>
+                          {asFileGrid ? null : isDecrypting ? (
+                            <span className="text-content-muted ml-2">
+                              <Icons.spinner size={16} className="animate-spin" />
+                            </span>
+                          ) : (
+                            <span className="text-accent ml-2">
+                              <Icons.private size={16} />
+                            </span>
+                          )}
+                        </button>
+                      )}
+                    </li>
+                  );
+                }
+
                 // The mark for the file's own type: a row of identical sheets
                 // says nothing about which attachment is the spreadsheet.
                 const Icon = Icons[fileIconOf(item.mimeType, item.name)];

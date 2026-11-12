@@ -17,6 +17,8 @@ import {
   useCapabilities,
 } from '@/features/server/use-capabilities';
 import { useTasraSlot } from '@/features/tasra/use-tasra-channel';
+import { useAutoDecryptTasra } from '@/features/tasra/auto-decrypt';
+import { useTasraSession } from '@/features/tasra/tasra-provider';
 import { cn } from '@/lib/cn';
 import { describeError } from '@/lib/errors';
 import { showToast } from '@/stores/toast-store';
@@ -99,6 +101,7 @@ export const MessageList = ({
   const { data: capabilities } = useCapabilities();
   const { data: room } = useRoom(roomId);
   const tasraSlot = useTasraSlot(room);
+  const tasraSession = useTasraSession();
 
   const viewport = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -126,6 +129,11 @@ export const MessageList = ({
 
   const messages = useMemo(() => data?.messages ?? [], [data]);
   const grouping = groupingPeriodMs(capabilities);
+
+  // Auto-decrypt Tasra messages as they arrive. The hook watches `messages`
+  // and kicks off up to 5 parallel decryptions, persisting results to IndexedDB
+  // so subsequent loads skip decryption entirely.
+  useAutoDecryptTasra(messages, tasraSlot, tasraSession);
 
   /**
    * Date separators are rows of their own, so they take part in measurement,

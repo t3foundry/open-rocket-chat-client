@@ -1,11 +1,20 @@
+import {
+  credentialAuthorization,
+  type TasraIdentity,
+} from '@t3foundry/tasra-sdk/app';
 import { encryptEnvelope, fromBytes, hexToBytes, toBytes, type GroupEnvelope } from '@t3foundry/tasra-sdk';
+import type { TypedDataSigner } from '@t3foundry/tasra-sdk/oid4vp';
 
+import { getVerifierAgentUrl } from './deployment';
 import type { EncryptedRecord } from './detect';
+import { getTasraApplication } from './tasra-application';
 
 /** The schema every record this module produces declares. */
 export const SCHEMA = 'tasra-encrypt/v2';
 /** Fixed title for a message record. */
 const MESSAGE_TITLE = 'message';
+/** Fixed title for a file record — the ciphertext is the uploaded file blob. */
+export const FILE_TITLE = 'file';
 /** AES-256 data key length. */
 export const DATA_KEY_LENGTH = 32;
 /** AES-GCM IV length. */
@@ -134,14 +143,99 @@ export async function sealMessage(
 }
 
 /**
+ * Encrypts `fileBytes` under `slot` the same way {@link sealMessage} encrypts
+ * text: AES-256-GCM under a fresh random data key, wrapped with the slot's
+ * group public key. The ciphertext (IV + AES-GCM output) is returned as a raw
+ * binary `Uint8Array` — the uploaded file — while the manifest and key envelope
+ * travel separately as an {@link EncryptedRecord} JSON in the message text.
+ *
+ * The record's `aesCiphertext` is empty: the ciphertext lives in the blob.
+ *
+ * @param fileName Used only in the decryption UI; not part of the AEAD.
+ */
+export async function sealFile(
+  fileBytes: Uint8Array<ArrayBuffer>,
+  slot: { slotId: `0x${string}`; publicKey: `0x${string}`; epoch: number },
+  recordId: string,
+  version: number,
+  deployment: { chainId: number; keyRegistry: string },
+): Promise<{ encryptedBlob: Uint8Array; record: EncryptedRecord }> {
+  const documentSha256 = toHex(await sha256(fileBytes));
+
+  // Same AAD as messages: binds the record id into the AEAD.
+  const aad = await sha256(new TextEncoder().encode(`${SCHEMA}:${recordId}`));
+
+  const dataKey = new Uint8Array(DATA_KEY_LENGTH);
+  crypto.getRandomValues(dataKey);
+
+  const iv = new Uint8Array(IV_LENGTH);
+  crypto.getRandomValues(iv);
+
+  const aesKey = await crypto.subtle.importKey('raw', dataKey, { name: 'AES-GCM' }, false, ['encrypt']);
+  const ciphertext = new Uint8Array(
+    await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad }, aesKey, fileBytes),
+  );
+
+  // IV + ciphertext as a self-contained binary blob.
+  const encryptedBlob = new Uint8Array(iv.length + ciphertext.length);
+  encryptedBlob.set(iv, 0);
+  encryptedBlob.set(ciphertext, iv.length);
+
+  // KEM identity is the document hash, exactly as for messages.
+  const identity = new TextEncoder().encode(documentSha256);
+
+  const envelope = encryptEnvelope(
+    hexToBytes(slot.slotId),
+    hexToBytes(slot.publicKey),
+    identity,
+    dataKey,
+    BigInt(slot.epoch),
+  );
+
+  dataKey.fill(0);
+
+  return {
+    encryptedBlob,
+    record: {
+      manifest: {
+        schema: SCHEMA,
+        recordId,
+        title: FILE_TITLE,
+        version,
+        documentSha256,
+        chainId: deployment.chainId,
+        keyRegistry: deployment.keyRegistry,
+        slotId: slot.slotId,
+      },
+      envelope: {
+        encryptedAesKey: b64(toBytes(envelope)),
+        // The ciphertext is the uploaded file; the JSON carries only the key
+        // material. An empty string tells the validator to skip the length
+        // check (the blob is validated separately by the caller).
+        aesCiphertext: '',
+        epoch: slot.epoch,
+      },
+    },
+  };
+}
+
+/**
  * Parses a record's key envelope and checks the invariants that let a reader
  * trust it enough to hand to the threshold decryption layer.
  *
  * Every failure is a "cannot decrypt" case, so each throws a descriptive
  * `Error` rather than a boolean. The parsed {@link GroupEnvelope} is returned
  * for the caller to decrypt with the slot's assembled master key.
+ *
+ * @param options.skipAesCiphertext When `true`, the `aesCiphertext` length
+ *   check is skipped so file records (whose ciphertext is the uploaded blob)
+ *   can pass validation.
  */
-export function validateEnvelope(record: EncryptedRecord, channelSlotId: `0x${string}`): GroupEnvelope {
+export function validateEnvelope(
+  record: EncryptedRecord,
+  channelSlotId: `0x${string}`,
+  options?: { skipAesCiphertext?: boolean },
+): GroupEnvelope {
   if (record.manifest.schema !== SCHEMA) {
     throw new Error('cannot decrypt: manifest schema is not tasra-encrypt/v2');
   }
@@ -179,15 +273,264 @@ export function validateEnvelope(record: EncryptedRecord, channelSlotId: `0x${st
     throw new Error('cannot decrypt: envelope identity does not match the document hash');
   }
 
-  let aesBytes: Uint8Array;
-  try {
-    aesBytes = unb64(record.envelope.aesCiphertext);
-  } catch {
-    throw new Error('cannot decrypt: aesCiphertext is not valid base64');
-  }
-  if (aesBytes.length < MIN_AES_CIPHERTEXT_LENGTH) {
-    throw new Error('cannot decrypt: aesCiphertext is too short');
+  if (!options?.skipAesCiphertext) {
+    let aesBytes: Uint8Array;
+    try {
+      aesBytes = unb64(record.envelope.aesCiphertext);
+    } catch {
+      throw new Error('cannot decrypt: aesCiphertext is not valid base64');
+    }
+    if (aesBytes.length < MIN_AES_CIPHERTEXT_LENGTH) {
+      throw new Error('cannot decrypt: aesCiphertext is too short');
+    }
   }
 
   return envelope;
+}
+
+/**
+ * Decrypts a `tasra-encrypt/v2` record into its original plaintext.
+ *
+ * The full multi-phase protocol: validates the envelope, obtains a reader
+ * credential from the gateway, builds a committee-custody authorizer, unwraps
+ * the data key via threshold BLS decrypt, AES-GCM decrypts the body, and
+ * verifies the document hash.
+ *
+ * The caller is responsible for caching the result; this function performs no
+ * caching of its own.
+ *
+ * @returns The plaintext message.
+ */
+export async function decryptMessage(
+  tasraRecord: EncryptedRecord,
+  tasraSlot: `0x${string}`,
+  options: {
+    getCredential: (slotId: string) => Promise<string>;
+    signer: TypedDataSigner;
+    identity: TasraIdentity;
+  },
+): Promise<string> {
+  const totalStart = performance.now();
+
+  // Validate the envelope against the channel's slot.
+  let stepStart = performance.now();
+  const envelope = validateEnvelope(tasraRecord, tasraSlot);
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing] envelope validation: ${(performance.now() - stepStart).toFixed(1)}ms`);
+
+  // Obtain the holder credential for this slot.
+  stepStart = performance.now();
+  const credential = await options.getCredential(tasraSlot);
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing] getCredential (issue or cache hit): ${(performance.now() - stepStart).toFixed(1)}ms`);
+
+  // Build the committee-custody authorizer.
+  stepStart = performance.now();
+  const authorize = credentialAuthorization({
+    verifierAgentUrl: getVerifierAgentUrl(),
+    signer: options.signer,
+    identity: options.identity,
+    credentials: [credential],
+  });
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing] credentialAuthorization: ${(performance.now() - stepStart).toFixed(1)}ms`);
+
+  // Unwrap the data key via threshold BLS decrypt.
+  // The SDK calls authorize() inside slot.decrypt() for OID4VP, then
+  // sends the compound token to the keeper for BLS threshold decrypt.
+  // Wrap the authorizer to split the timing of these two phases.
+  let oid4vpStart = 0;
+  let oid4vpEnd = 0;
+  const timedAuthorize = async (request: Parameters<typeof authorize>[0]) => {
+    oid4vpStart = performance.now();
+    const grant = await authorize(request);
+    oid4vpEnd = performance.now();
+    return grant;
+  };
+
+  stepStart = performance.now();
+  const slot = await getTasraApplication().slots.bls(tasraRecord.manifest.slotId);
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing] slots.bls (get slot handle): ${(performance.now() - stepStart).toFixed(1)}ms`);
+
+  stepStart = performance.now();
+  const { plaintext: dataKeyRaw } = await slot.decrypt(envelope.identity, envelope.ciphertext, {
+    authorize: timedAuthorize,
+    requireReceipts: true,
+    description: 'Decrypt a channel message',
+  });
+  const committeeEnd = performance.now();
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing]   └ OID4VP (verifier agent + credential presentation + token): ${(oid4vpEnd - oid4vpStart).toFixed(1)}ms`);
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing]   └ BLS keeper threshold decrypt: ${(committeeEnd - oid4vpEnd).toFixed(1)}ms`);
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing] slot.decrypt total: ${(committeeEnd - stepStart).toFixed(1)}ms`);
+
+  // `dataKeyRaw` is Uint8Array<ArrayBufferLike>; copy to a plain
+  // Uint8Array<ArrayBuffer> so WebCrypto accepts it as BufferSource.
+  stepStart = performance.now();
+  const dataKey = new Uint8Array(dataKeyRaw);
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing] dataKey copy: ${(performance.now() - stepStart).toFixed(1)}ms`);
+
+  try {
+    // AES-GCM decrypt the message body.
+    stepStart = performance.now();
+    const aesCiphertext = unb64(tasraRecord.envelope.aesCiphertext);
+    const iv = aesCiphertext.subarray(0, 12);
+    const ciphertext = aesCiphertext.subarray(12) as BufferSource;
+
+    const aad = await sha256(new TextEncoder().encode(`${SCHEMA}:${tasraRecord.manifest.recordId}`));
+    const aesKey = await crypto.subtle.importKey('raw', dataKey, { name: 'AES-GCM' }, false, ['decrypt']);
+    const plainBytes = new Uint8Array(
+      await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: iv as BufferSource, additionalData: aad },
+        aesKey,
+        ciphertext,
+      ),
+    );
+// eslint-disable-next-line no-console
+    console.log(`[tasra:timing] AES-GCM decrypt (sha256 aad + importKey + decrypt): ${(performance.now() - stepStart).toFixed(1)}ms`);
+
+    // Verify the document hash.
+    stepStart = performance.now();
+    const computedHash = toHex(await sha256(plainBytes));
+    if (computedHash !== tasraRecord.manifest.documentSha256) {
+      throw new Error('document hash mismatch');
+    }
+// eslint-disable-next-line no-console
+    console.log(`[tasra:timing] document hash verify (sha256 + hex): ${(performance.now() - stepStart).toFixed(1)}ms`);
+
+    const text = new TextDecoder().decode(plainBytes);
+// eslint-disable-next-line no-console
+    console.log(`[tasra:timing] TOTAL decrypt: ${(performance.now() - totalStart).toFixed(1)}ms`);
+
+    return text;
+  } finally {
+    // Per spec §9 step 6: zeroize the data key after use.
+    dataKey.fill(0);
+  }
+}
+
+/**
+ * Decrypts an encrypted file blob produced by {@link sealFile}.
+ *
+ * The full multi-phase protocol is the same as {@link decryptMessage}: validate
+ * the envelope, obtain a reader credential, unwrap the data key via threshold
+ * BLS, AES-GCM decrypt the blob, and verify the document hash. The only
+ * difference is that the ciphertext comes from the external `encryptedBlob`
+ * parameter (the downloaded file) rather than from a base64 field in the JSON
+ * record.
+ *
+ * @returns The original file bytes.
+ */
+export async function decryptFile(
+  tasraRecord: EncryptedRecord,
+  encryptedBlob: Uint8Array,
+  tasraSlot: `0x${string}`,
+  options: {
+    getCredential: (slotId: string) => Promise<string>;
+    signer: TypedDataSigner;
+    identity: TasraIdentity;
+  },
+): Promise<Uint8Array> {
+  const totalStart = performance.now();
+
+  // Validate the envelope against the channel's slot (skip aesCiphertext check).
+  let stepStart = performance.now();
+  const envelope = validateEnvelope(tasraRecord, tasraSlot, { skipAesCiphertext: true });
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing] file envelope validation: ${(performance.now() - stepStart).toFixed(1)}ms`);
+
+  // Guard: the blob must be at least IV + GCM tag.
+  if (encryptedBlob.length < MIN_AES_CIPHERTEXT_LENGTH) {
+    throw new Error('cannot decrypt: encrypted file is too short');
+  }
+
+  // Obtain the holder credential for this slot.
+  stepStart = performance.now();
+  const credential = await options.getCredential(tasraSlot);
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing] file getCredential: ${(performance.now() - stepStart).toFixed(1)}ms`);
+
+  // Build the committee-custody authorizer.
+  stepStart = performance.now();
+  const authorize = credentialAuthorization({
+    verifierAgentUrl: getVerifierAgentUrl(),
+    signer: options.signer,
+    identity: options.identity,
+    credentials: [credential],
+  });
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing] file credentialAuthorization: ${(performance.now() - stepStart).toFixed(1)}ms`);
+
+  // Unwrap the data key via threshold BLS decrypt.
+  let oid4vpStart = 0;
+  let oid4vpEnd = 0;
+  const timedAuthorize = async (request: Parameters<typeof authorize>[0]) => {
+    oid4vpStart = performance.now();
+    const grant = await authorize(request);
+    oid4vpEnd = performance.now();
+    return grant;
+  };
+
+  stepStart = performance.now();
+  const slot = await getTasraApplication().slots.bls(tasraRecord.manifest.slotId);
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing] file slots.bls: ${(performance.now() - stepStart).toFixed(1)}ms`);
+
+  stepStart = performance.now();
+  const { plaintext: dataKeyRaw } = await slot.decrypt(envelope.identity, envelope.ciphertext, {
+    authorize: timedAuthorize,
+    requireReceipts: true,
+    description: 'Decrypt a channel file',
+  });
+  const committeeEnd = performance.now();
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing]   └ OID4VP: ${(oid4vpEnd - oid4vpStart).toFixed(1)}ms`);
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing]   └ BLS keeper: ${(committeeEnd - oid4vpEnd).toFixed(1)}ms`);
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing] file slot.decrypt total: ${(committeeEnd - stepStart).toFixed(1)}ms`);
+
+  stepStart = performance.now();
+  const dataKey = new Uint8Array(dataKeyRaw);
+// eslint-disable-next-line no-console
+  console.log(`[tasra:timing] file dataKey copy: ${(performance.now() - stepStart).toFixed(1)}ms`);
+
+  try {
+    // AES-GCM decrypt the file blob.
+    stepStart = performance.now();
+    const iv = encryptedBlob.subarray(0, 12);
+    const ciphertext = encryptedBlob.subarray(12) as BufferSource;
+
+    const aad = await sha256(new TextEncoder().encode(`${SCHEMA}:${tasraRecord.manifest.recordId}`));
+    const aesKey = await crypto.subtle.importKey('raw', dataKey, { name: 'AES-GCM' }, false, ['decrypt']);
+    const plainBytes = new Uint8Array(
+      await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: iv as BufferSource, additionalData: aad },
+        aesKey,
+        ciphertext,
+      ),
+    );
+// eslint-disable-next-line no-console
+    console.log(`[tasra:timing] file AES-GCM decrypt: ${(performance.now() - stepStart).toFixed(1)}ms`);
+
+    // Verify the document hash.
+    stepStart = performance.now();
+    const computedHash = toHex(await sha256(plainBytes));
+    if (computedHash !== tasraRecord.manifest.documentSha256) {
+      throw new Error('document hash mismatch');
+    }
+// eslint-disable-next-line no-console
+    console.log(`[tasra:timing] file document hash verify: ${(performance.now() - stepStart).toFixed(1)}ms`);
+
+// eslint-disable-next-line no-console
+    console.log(`[tasra:timing] TOTAL file decrypt: ${(performance.now() - totalStart).toFixed(1)}ms`);
+
+    return plainBytes;
+  } finally {
+    dataKey.fill(0);
+  }
 }

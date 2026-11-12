@@ -131,7 +131,10 @@
   "tasra": {
     "encrypted": "Tin nhắn đã mã hóa — nhấp để giải mã",
     "decrypting": "Đang giải mã…",
-    "cannotDecrypt": "Không thể giải mã tin nhắn này"
+    "cannotDecrypt": "Không thể giải mã tin nhắn này",
+    "retry": "Thử lại",
+    "encryptedFile": "Tệp đã mã hóa — nhấp để giải mã bên dưới",
+    "clickToDecrypt": "Nhấp để giải mã và tải xuống"
   },
   "attachments_other": "{{count}} tệp đính kèm"
 }

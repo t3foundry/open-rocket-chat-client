@@ -1,7 +1,7 @@
 import type { TasraIdentity, TasraApplication } from '@t3foundry/tasra-sdk/app';
 import type { TypedDataSigner } from '@t3foundry/tasra-sdk/oid4vp';
 import { createIdentity, createLocalWallet } from '@t3foundry/tasra-sdk/app';
-import { createContext, use, useLayoutEffect, useState, type ReactNode } from 'react';
+import { createContext, use, useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 
 import { client } from '@/lib/client';
 
@@ -47,6 +47,13 @@ export const TasraProvider = ({ children }: { children: ReactNode }) => {
   // per effect run — and letting only that run's cleanup destroy it — is what
   // keeps the two passes independent.
   const [session, setSession] = useState<TasraSessionValue | null>(null);
+
+  // Load persisted decryption cache from IndexedDB before the first render
+  // that shows messages. A failure is silent: the app starts with an empty
+  // cache and decrypts on demand.
+  useEffect(() => {
+    void decryptedCache.load();
+  }, []);
 
   // `useLayoutEffect` rather than `useEffect` so the first render that shows
   // children already carries the session, with no blank frame in between.

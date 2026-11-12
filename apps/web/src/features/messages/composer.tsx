@@ -8,7 +8,7 @@ import { useRealtime } from '@/features/realtime/realtime-provider';
 import { useRoom } from '@/features/rooms/use-rooms';
 import { useServerConnection, useServerId } from '@/features/servers/server-scope';
 import { looksEncrypted, type EncryptedRecord } from '@/features/tasra/detect';
-import { sealMessage } from '@/features/tasra/crypto';
+import { sealMessage, sealFile } from '@/features/tasra/crypto';
 import { useTasraDeployment, useSlotPublicKey, useTasraSlot } from '@/features/tasra/use-tasra-channel';
 import { cn } from '@/lib/cn';
 import { describeError } from '@/lib/errors';
@@ -488,28 +488,32 @@ export const Composer = ({
         // rest are posted with their own captions.
         let uploaded = 0;
 
-        // In an encrypted channel, seal the text that rides along with the
-        // first file. The .txt file path (convertsToFile) is skipped: the file
-        // content is the message, and wrapping ciphertext in a .txt would be
-        // self-defeating. Note: captions on subsequent files remain plaintext;
-        // text encryption for uploads with incomplete key material is a known
-        // limitation tracked separately.
-        const sealedText =
-          tasraSlot && publicKeyData && deployment && publicKeyData.publicKey.startsWith('0x')
-            ? JSON.stringify(
-                await sealMessage(
-                  outgoing,
-                  {
-                    slotId: tasraSlot,
-                    publicKey: publicKeyData.publicKey as `0x${string}`,
-                    epoch: publicKeyData.epoch,
-                  },
-                  crypto.randomUUID(),
-                  0,
-                  { chainId: deployment.chainId, keyRegistry: deployment.keyRegistry },
-                ),
-              )
-            : null;
+        // Whether this channel is end-to-end encrypted with key material ready.
+        const encryptsChannel = Boolean(
+          tasraSlot && publicKeyData && deployment && publicKeyData.publicKey.startsWith('0x'),
+        );
+
+        // In an encrypted channel with files and message text, send the text
+        // as a separate encrypted message before the files. Each file then
+        // carries its own encryption metadata as its upload text.
+        // The .txt long-message path (convertsToFile) is excluded: the file
+        // content already IS the message.
+        if (encryptsChannel && outgoing.trim() && staged.length > 0 && !convertsToFile) {
+          const sealed = JSON.stringify(
+            await sealMessage(
+              outgoing,
+              {
+                slotId: tasraSlot!,
+                publicKey: publicKeyData!.publicKey as `0x${string}`,
+                epoch: publicKeyData!.epoch,
+              },
+              crypto.randomUUID(),
+              0,
+              { chainId: deployment!.chainId, keyRegistry: deployment!.keyRegistry },
+            ),
+          );
+          await send.mutateAsync({ text: sealed, ...(threadId ? { threadId } : {}) });
+        }
 
         // The draft the server would refuse goes up as its own file, ahead of
         // anything staged, so it reads as the message it was written to be —
@@ -529,17 +533,49 @@ export const Composer = ({
           if (!signal) continue;
 
           try {
+            let uploadFile: File;
+            let textPayload: string | undefined;
+
+            if (encryptsChannel) {
+              // Encrypt the file contents using the same AES-256-GCM + KEM
+              // scheme as messages. The encrypted blob is uploaded in place
+              // of the original file, and the manifest + key envelope travel
+              // as the upload's text field.
+              const fileBytes = new Uint8Array(await item.file.arrayBuffer()) as Uint8Array<ArrayBuffer>;
+              const recordId = crypto.randomUUID();
+              const { encryptedBlob, record } = await sealFile(
+                fileBytes,
+                {
+                  slotId: tasraSlot!,
+                  publicKey: publicKeyData!.publicKey as `0x${string}`,
+                  epoch: publicKeyData!.epoch,
+                },
+                recordId,
+                0,
+                { chainId: deployment!.chainId, keyRegistry: deployment!.keyRegistry },
+              );
+              uploadFile = new File(
+                [new Uint8Array(encryptedBlob)],
+                `${item.file.name}.tasra`,
+                { type: 'application/octet-stream' },
+              );
+              textPayload = JSON.stringify(record);
+            } else {
+              uploadFile = item.file;
+              // In a plaintext channel the outgoing text rides along with the
+              // first file that actually goes up.
+              textPayload = uploaded === 0 && outgoing ? outgoing : undefined;
+            }
+
             // Through the mutation rather than the client directly: it puts the
             // message the server made into the timeline as each file lands, so
             // an upload appears while the rest of the batch is still going up.
             await upload.mutateAsync({
-              file: item.file,
+              file: uploadFile,
               signal,
               onProgress: ({ loaded, total }) => attachments.setProgress(item.id, loaded, total),
               ...(item.caption ? { description: item.caption } : {}),
-              // The text belongs to the first file that actually goes up, not
-              // to whichever one was first before the removals.
-              ...(uploaded === 0 && (sealedText ?? outgoing) ? { text: sealedText ?? outgoing } : {}),
+              ...(textPayload ? { text: textPayload } : {}),
               ...(threadId ? { threadId } : {}),
             });
             uploaded += 1;
