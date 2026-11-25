@@ -239,8 +239,8 @@ importers:
         specifier: ^1.2.16
         version: 1.2.16(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@t3foundry/tasra-sdk':
-        specifier: 0.3.1
-        version: 0.3.1(typescript@5.9.3)(zod@4.4.3)
+        specifier: file:../../../.sdk-packs/0.5.0/t3foundry-tasra-sdk-0.5.0.tgz
+        version: file:../.sdk-packs/0.5.0/t3foundry-tasra-sdk-0.5.0.tgz(typescript@5.9.3)(zod@4.4.3)
       '@tanstack/query-async-storage-persister':
         specifier: ^5.101.4
         version: 5.101.4
@@ -711,6 +711,22 @@ packages:
 
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
+
+  '@hpke/chacha20poly1305@1.7.1':
+    resolution: {integrity: sha512-Zp8IwRIkdCucu877wCNqDp3B8yOhAnAah/YDDkO94pPr/KKV7IGnBbpwIjDB3BsAySWBMrhhdE0JKYw3N4FCag==}
+    engines: {node: '>=16.0.0'}
+
+  '@hpke/common@1.13.0':
+    resolution: {integrity: sha512-PqaJR89RWJQmt/WOGuBLrcrtXtEMbWu91XIbxDjKDTDgKvqvhlxOzQ9BAf9a0Q+yqqbTtQ0pK6KUyVi2WMehbA==}
+    engines: {node: '>=16.0.0'}
+
+  '@hpke/core@1.9.0':
+    resolution: {integrity: sha512-pFxWl1nNJeQCSUFs7+GAblHvXBCjn9EPN65vdKlYQil2aURaRxfGMO6vBKGqm1YHTKwiAxJQNEI70PbSowMP9Q==}
+    engines: {node: '>=16.0.0'}
+
+  '@hpke/dhkem-x25519@1.6.4':
+    resolution: {integrity: sha512-TTkZ3hjMDO6TweSTSAN/qL30WubOXJXTe/1eNL4cprlGokcjJq3SldcePI2BbC1eOYq903N1X6zwDjVG5OelfA==}
+    engines: {node: '>=16.0.0'}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -1892,8 +1908,9 @@ packages:
       typescript:
         optional: true
 
-  '@t3foundry/tasra-sdk@0.3.1':
-    resolution: {integrity: sha512-u/YLo5kjTK4wsxBhFR//vVBCV/4my3jJFdBifWQRJf81ZoINUhDidwor8oPPTA6hjBm9Lv4m/KtuflMFYpQmZw==}
+  '@t3foundry/tasra-sdk@file:../.sdk-packs/0.5.0/t3foundry-tasra-sdk-0.5.0.tgz':
+    resolution: {integrity: sha512-+7UtQf1+5J9b+oEN1gJMwox19b98jiyIjcGALffh+fnYB9SKzn9wSQouqZKCgRtq9d2gQ/kDBNx7teXK1kmFOQ==, tarball: file:../.sdk-packs/0.5.0/t3foundry-tasra-sdk-0.5.0.tgz}
+    version: 0.5.0
     engines: {node: '>=22.12'}
 
   '@tailwindcss/node@4.3.3':
@@ -4595,6 +4612,20 @@ snapshots:
 
   '@floating-ui/utils@0.2.12': {}
 
+  '@hpke/chacha20poly1305@1.7.1':
+    dependencies:
+      '@hpke/common': 1.13.0
+
+  '@hpke/common@1.13.0': {}
+
+  '@hpke/core@1.9.0':
+    dependencies:
+      '@hpke/common': 1.13.0
+
+  '@hpke/dhkem-x25519@1.6.4':
+    dependencies:
+      '@hpke/common': 1.13.0
+
   '@humanfs/core@0.19.2':
     dependencies:
       '@humanfs/types': 0.15.0
@@ -5519,8 +5550,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@t3foundry/tasra-sdk@0.3.1(typescript@5.9.3)(zod@4.4.3)':
+  '@t3foundry/tasra-sdk@file:../.sdk-packs/0.5.0/t3foundry-tasra-sdk-0.5.0.tgz(typescript@5.9.3)(zod@4.4.3)':
     dependencies:
+      '@hpke/chacha20poly1305': 1.7.1
+      '@hpke/core': 1.9.0
+      '@hpke/dhkem-x25519': 1.6.4
       '@noble/ciphers': 1.3.0
       '@noble/curves': 1.9.7
       '@noble/hashes': 1.8.0

@@ -136,7 +136,8 @@
     "cannotDecrypt": "Cannot decrypt this message",
     "retry": "Retry",
     "encryptedFile": "Encrypted file — click to decrypt below",
-    "clickToDecrypt": "Click to decrypt and download"
+    "clickToDecrypt": "Click to decrypt and download",
+    "balanceExhausted": "This channel's balance is exhausted. Ask the channel owner to fund it, then retry."
   },
   "attachments_one": "{{count}} attachment",
   "attachments_other": "{{count}} attachments"

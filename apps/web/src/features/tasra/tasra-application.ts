@@ -1,6 +1,6 @@
 import { createTasra, type TasraApplication } from '@t3foundry/tasra-sdk/app';
 
-import { getDeployment } from './deployment';
+import { resolveTasraDeployment } from './deployment';
 
 /**
  * The application client, created once and shared by everybody who talks to Tasra.
@@ -11,5 +11,12 @@ import { getDeployment } from './deployment';
  */
 let instance: TasraApplication | undefined;
 
-export const getTasraApplication = (): TasraApplication =>
-  (instance ??= createTasra({ deployment: getDeployment() }));
+export const getTasraApplication = (): TasraApplication => {
+  if (!instance) {
+    // The manifest's keeper routing (a local fleet's registered URL → reachable URL map) applies
+    // to every keeper request the application makes.
+    const { deployment, keeperUrl } = resolveTasraDeployment();
+    instance = createTasra({ deployment, ...(keeperUrl ? { keeperUrl } : {}) });
+  }
+  return instance;
+};

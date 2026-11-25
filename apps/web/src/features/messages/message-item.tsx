@@ -8,7 +8,9 @@ import { isPreviewable, mediaKindOf, useMediaStore, type MediaItem } from '@/fea
 import { UserCard } from '@/features/rooms/user-card';
 import { useClient } from '@/features/servers/server-scope';
 import { decryptMessage, decryptFile } from '@/features/tasra/crypto';
+import { isChannelBalanceError } from '@/features/tasra/channel-unwrap';
 import { decryptedCache } from '@/features/tasra/decrypt-cache';
+import { decryptFailures } from '@/features/tasra/decrypt-failures';
 import { looksEncrypted, isEncryptedFileRecord, parseEncryptedFileRecord, type EncryptedRecord } from '@/features/tasra/detect';
 import { useTasraSession } from '@/features/tasra/tasra-provider';
 import { copyText } from '@/lib/clipboard';
@@ -157,7 +159,7 @@ export const MessageItem = ({
     | { status: 'idle' }
     | { status: 'loading' }
     | { status: 'decrypted'; text: string }
-    | { status: 'error'; error: string };
+    | { status: 'error'; error: string; balance: boolean };
 
   const [decryptState, setDecryptState] = useState<DecryptState>({ status: 'idle' });
 
@@ -177,23 +179,35 @@ export const MessageItem = ({
     () => null, // SSR snapshot — not applicable.
   );
 
+  // Why the auto-decrypter gave up on this message, if it did. Without this the
+  // message would read "Decrypting…" for ever.
+  const autoFailure = useSyncExternalStore(
+    decryptFailures.subscribe,
+    () => (tasraRecord ? (decryptFailures.get(tasraRecord.manifest.recordId) ?? null) : null),
+    () => null,
+  );
+  // What the body shows as the failure: the user's own attempt, else the automatic one.
+  const decryptFailure =
+    decryptState.status === 'error'
+      ? decryptState
+      : decryptState.status === 'idle' && autoFailure
+        ? { error: autoFailure.message, balance: autoFailure.balance }
+        : null;
+
   const handleDecrypt = useCallback(async () => {
     if (!tasraRecord || !tasraSlot) return;
 
     setDecryptState({ status: 'loading' });
 
     try {
-      const text = await decryptMessage(tasraRecord, tasraSlot, {
-        getCredential: tasraSession.getCredential,
-        signer: tasraSession.signer,
-        identity: tasraSession.identity,
-      });
+      const text = await decryptMessage(tasraRecord, tasraSlot, { unwrapDataKey: tasraSession.unwrapDataKey });
 
       decryptedCache.set(tasraRecord.manifest.recordId, {
         text,
         version: tasraRecord.manifest.version,
       });
 
+      decryptFailures.remove(tasraRecord.manifest.recordId);
       setDecryptState({ status: 'decrypted', text });
     } catch (decryptError) {
       // The reason is surfaced here (not just swallowed) because every failure
@@ -206,6 +220,7 @@ export const MessageItem = ({
       setDecryptState({
         status: 'error',
         error: decryptError instanceof Error ? decryptError.message : 'Unknown error',
+        balance: isChannelBalanceError(decryptError),
       });
     }
   }, [tasraRecord, tasraSlot, tasraSession]);
@@ -215,7 +230,7 @@ export const MessageItem = ({
     | { status: 'idle' }
     | { status: 'loading' }
     | { status: 'decrypted'; blobUrl: string; fileName: string; sizeBytes: number | null }
-    | { status: 'error'; error: string };
+    | { status: 'error'; error: string; balance: boolean };
 
   const [fileDecryptState, setFileDecryptState] = useState<FileDecryptState>({ status: 'idle' });
   // Track which file entry was decrypted so the state stays scoped.
@@ -239,11 +254,7 @@ export const MessageItem = ({
         const encryptedBlob = new Uint8Array(await response.arrayBuffer());
 
         // Decrypt.
-        const plainBytes = await decryptFile(fileRecord, encryptedBlob, tasraSlot, {
-          getCredential: tasraSession.getCredential,
-          signer: tasraSession.signer,
-          identity: tasraSession.identity,
-        });
+        const plainBytes = await decryptFile(fileRecord, encryptedBlob, tasraSlot, { unwrapDataKey: tasraSession.unwrapDataKey });
 
         // Create a blob URL for download. The blob is eligible for garbage
         // collection once the URL is revoked (on unmount or re-decrypt).
@@ -264,6 +275,7 @@ export const MessageItem = ({
         setFileDecryptState({
           status: 'error',
           error: err instanceof Error ? err.message : 'Unknown error',
+          balance: isChannelBalanceError(err),
         });
       }
     },
@@ -493,7 +505,7 @@ export const MessageItem = ({
                   <div className="flex flex-col gap-1">
                     <p className="text-content-muted flex items-center gap-1.5 italic">
                       <Icons.private size={14} />
-                      {t('tasra.encryptedFile')}
+                      {fileDecryptState.balance ? t('tasra.balanceExhausted') : t('tasra.encryptedFile')}
                     </p>
                     <button
                       type="button"
@@ -518,11 +530,12 @@ export const MessageItem = ({
                   />
                 ) : decryptState.status === 'loading' ? (
                   <p className="text-content-muted italic">{t('tasra.decrypting')}</p>
-                ) : decryptState.status === 'error' ? (
+                ) : decryptFailure ? (
                   <div className="flex flex-col gap-1">
                     <p className="text-content-muted italic">
-                      {t('tasra.cannotDecrypt')}
-                      {decryptState.error ? ` — ${decryptState.error}` : ''}
+                      {decryptFailure.balance
+                        ? t('tasra.balanceExhausted')
+                        : `${t('tasra.cannotDecrypt')}${decryptFailure.error ? ` — ${decryptFailure.error}` : ''}`}
                     </p>
                     <button
                       type="button"

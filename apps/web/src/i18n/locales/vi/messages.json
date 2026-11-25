@@ -134,7 +134,8 @@
     "cannotDecrypt": "Không thể giải mã tin nhắn này",
     "retry": "Thử lại",
     "encryptedFile": "Tệp đã mã hóa — nhấp để giải mã bên dưới",
-    "clickToDecrypt": "Nhấp để giải mã và tải xuống"
+    "clickToDecrypt": "Nhấp để giải mã và tải xuống",
+    "balanceExhausted": "Số dư của kênh này đã hết. Hãy nhờ chủ kênh nạp thêm rồi thử lại."
   },
   "attachments_other": "{{count}} tệp đính kèm"
 }
