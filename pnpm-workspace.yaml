@@ -10,3 +10,6 @@ overrides:
 
 allowBuilds:
   esbuild: true
+
+minimumReleaseAgeExclude:
+  - '@t3foundry/tasra-sdk@0.5.0-preview'

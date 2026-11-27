@@ -5,9 +5,13 @@ import { createContext, use, useEffect, useLayoutEffect, useState, type ReactNod
 
 import { client } from '@/lib/client';
 
+import { createChannelUnwrapper, type ChannelUnwrapper } from './channel-unwrap';
 import { createCredentialCache } from './credential-cache';
+import type { UnwrapDataKey } from './crypto';
 import { decryptedCache } from './decrypt-cache';
+import { decryptFailures } from './decrypt-failures';
 import { getDeployment } from './deployment';
+import { channelUnwrapDeps } from './session-config';
 import { getTasraApplication } from './tasra-application';
 
 /**
@@ -26,6 +30,14 @@ export interface TasraSessionValue {
    * after an expired session without restarting the app.
    */
   getCredential: (slotId: string) => Promise<string>;
+  /**
+   * Recovers a message's AES data key through the channel's decrypt session:
+   * the first message of a slot presents the reader credential and opens a
+   * session grant, later messages reuse it, and messages that arrive together
+   * share one keeper request. The reader pays nothing and needs no key of the
+   * slot's owner.
+   */
+  unwrapDataKey: UnwrapDataKey;
   /** The Tasra application client, shared across the app. */
   application: TasraApplication;
 }
@@ -59,9 +71,9 @@ export const TasraProvider = ({ children }: { children: ReactNode }) => {
   // children already carries the session, with no blank frame in between.
   useLayoutEffect(() => {
     const identity = createIdentity();
-    // A fresh random signing key is generated per session. The verifier no
-    // longer checks the creator identity for these operations, so any valid
-    // signer is accepted.
+    // The reader's own signing key: a fresh random one per login session. Any
+    // key may open a decrypt session; the slot's rule decides whether the
+    // presented credential is admitted.
     const signer = createLocalWallet(getDeployment()).signer;
     const cache = createCredentialCache(async (id) => {
       const callStart = performance.now();
@@ -70,17 +82,31 @@ export const TasraProvider = ({ children }: { children: ReactNode }) => {
       return result.credential;
     });
 
+    // Built on first use, so a missing deployment setting fails the decrypt that needs it
+    // (with a message the timeline can show) rather than the whole session.
+    let unwrapper: ChannelUnwrapper | undefined;
+    const unwrapDataKey: UnwrapDataKey = async (slotId, envelope) => {
+      unwrapper ??= createChannelUnwrapper(
+        channelUnwrapDeps({ signer, identity, getCredential: (id) => cache.get(id) }),
+      );
+      return unwrapper.unwrap(slotId, envelope);
+    };
+
     setSession({
       identity,
       signer,
       getCredential: (slotId) => cache.get(slotId),
+      unwrapDataKey,
       application: getTasraApplication(),
     });
 
     return () => {
+      // Revokes every channel session at the verifiers before the keys go.
+      unwrapper?.dispose();
       identity.destroy();
       // Plaintext lives for the session only; a later login starts clean.
       decryptedCache.clear();
+      decryptFailures.clear();
     };
   }, []);
 

@@ -1,9 +1,9 @@
 import {
   resolveApplicationManifest,
+  type ApplicationManifest,
   type ResolvedApplicationManifest,
   type TasraDeployment,
 } from '@t3foundry/tasra-sdk/app';
-import type { NetworkManifest } from '@t3foundry/tasra-sdk/chain';
 
 import rawNetwork from './network.json';
 
@@ -23,8 +23,34 @@ let resolved: ResolvedApplicationManifest | undefined;
  * manifest's `services`. It does not construct a `TasraClient`.
  */
 export function resolveTasraDeployment(): ResolvedApplicationManifest {
-  resolved ??= resolveApplicationManifest(rawNetwork as NetworkManifest, { coordinator: 'lowest-operator-id' });
+  if (!resolved) {
+    const manifest = networkManifest();
+    // A release manifest names no coordinator convention, so the build states it; an application
+    // deployment document carries its own.
+    resolved = resolveApplicationManifest(manifest, 'contracts' in manifest ? { coordinator: 'lowest-operator-id' } : {});
+  }
   return resolved;
+}
+
+/**
+ * The network this build talks to: the checked-in manifest, unless the build
+ * names another one in `VITE_TASRA_NETWORK_MANIFEST` (the manifest JSON itself).
+ * That is how a build is pointed at a local or private Tasra network.
+ *
+ * The override is either a release network manifest or an application
+ * deployment document (`schemaVersion`, `name`, `chainId`, `rpcUrl`,
+ * `addresses`, `coordinator`, and optionally `verifierAgentUrl` and
+ * `keeperUrls`). The second form is how a local fleet maps each registered
+ * keeper URL to one this browser can reach.
+ */
+function networkManifest(): ApplicationManifest {
+  const override = (import.meta.env.VITE_TASRA_NETWORK_MANIFEST as string | undefined)?.trim();
+  if (!override) return rawNetwork as ApplicationManifest;
+  try {
+    return JSON.parse(override) as ApplicationManifest;
+  } catch {
+    throw new Error('VITE_TASRA_NETWORK_MANIFEST is not valid JSON');
+  }
 }
 
 /** The validated deployment, resolved lazily on first access. */

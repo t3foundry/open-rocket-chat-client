@@ -1,13 +1,19 @@
-import {
-  credentialAuthorization,
-  type TasraIdentity,
-} from '@t3foundry/tasra-sdk/app';
 import { encryptEnvelope, fromBytes, hexToBytes, toBytes, type GroupEnvelope } from '@t3foundry/tasra-sdk';
-import type { TypedDataSigner } from '@t3foundry/tasra-sdk/oid4vp';
 
-import { getVerifierAgentUrl } from './deployment';
 import type { EncryptedRecord } from './detect';
-import { getTasraApplication } from './tasra-application';
+
+/**
+ * Recovers the AES data key wrapped in a validated envelope. In the app this is
+ * the channel's decrypt session in `channel-unwrap.ts`; the caller of
+ * {@link decryptMessage} supplies it so this module stays free of network,
+ * storage and wallet concerns.
+ */
+export type UnwrapDataKey = (slotId: `0x${string}`, envelope: GroupEnvelope) => Promise<Uint8Array>;
+
+/** What a decryption needs from the session. */
+export interface DecryptOptions {
+  unwrapDataKey: UnwrapDataKey;
+}
 
 /** The schema every record this module produces declares. */
 export const SCHEMA = 'tasra-encrypt/v2';
@@ -304,11 +310,7 @@ export function validateEnvelope(
 export async function decryptMessage(
   tasraRecord: EncryptedRecord,
   tasraSlot: `0x${string}`,
-  options: {
-    getCredential: (slotId: string) => Promise<string>;
-    signer: TypedDataSigner;
-    identity: TasraIdentity;
-  },
+  options: DecryptOptions,
 ): Promise<string> {
   const totalStart = performance.now();
 
@@ -318,59 +320,19 @@ export async function decryptMessage(
 // eslint-disable-next-line no-console
   console.log(`[tasra:timing] envelope validation: ${(performance.now() - stepStart).toFixed(1)}ms`);
 
-  // Obtain the holder credential for this slot.
+  // Unwrap the data key: the channel session's grant authorizes this message,
+  // the keeper committee returns recipient-sealed shares, and only this client
+  // opens and combines them.
   stepStart = performance.now();
-  const credential = await options.getCredential(tasraSlot);
+  const dataKeyRaw = await options.unwrapDataKey(tasraSlot, envelope);
 // eslint-disable-next-line no-console
-  console.log(`[tasra:timing] getCredential (issue or cache hit): ${(performance.now() - stepStart).toFixed(1)}ms`);
-
-  // Build the committee-custody authorizer.
-  stepStart = performance.now();
-  const authorize = credentialAuthorization({
-    verifierAgentUrl: getVerifierAgentUrl(),
-    signer: options.signer,
-    identity: options.identity,
-    credentials: [credential],
-  });
-// eslint-disable-next-line no-console
-  console.log(`[tasra:timing] credentialAuthorization: ${(performance.now() - stepStart).toFixed(1)}ms`);
-
-  // Unwrap the data key via threshold BLS decrypt.
-  // The SDK calls authorize() inside slot.decrypt() for OID4VP, then
-  // sends the compound token to the keeper for BLS threshold decrypt.
-  // Wrap the authorizer to split the timing of these two phases.
-  let oid4vpStart = 0;
-  let oid4vpEnd = 0;
-  const timedAuthorize = async (request: Parameters<typeof authorize>[0]) => {
-    oid4vpStart = performance.now();
-    const grant = await authorize(request);
-    oid4vpEnd = performance.now();
-    return grant;
-  };
-
-  stepStart = performance.now();
-  const slot = await getTasraApplication().slots.bls(tasraRecord.manifest.slotId);
-// eslint-disable-next-line no-console
-  console.log(`[tasra:timing] slots.bls (get slot handle): ${(performance.now() - stepStart).toFixed(1)}ms`);
-
-  stepStart = performance.now();
-  const { plaintext: dataKeyRaw } = await slot.decrypt(envelope.identity, envelope.ciphertext, {
-    authorize: timedAuthorize,
-    requireReceipts: true,
-    description: 'Decrypt a channel message',
-  });
-  const committeeEnd = performance.now();
-// eslint-disable-next-line no-console
-  console.log(`[tasra:timing]   └ OID4VP (verifier agent + credential presentation + token): ${(oid4vpEnd - oid4vpStart).toFixed(1)}ms`);
-// eslint-disable-next-line no-console
-  console.log(`[tasra:timing]   └ BLS keeper threshold decrypt: ${(committeeEnd - oid4vpEnd).toFixed(1)}ms`);
-// eslint-disable-next-line no-console
-  console.log(`[tasra:timing] slot.decrypt total: ${(committeeEnd - stepStart).toFixed(1)}ms`);
+  console.log(`[tasra:timing] unwrap data key (session grant + keeper committee): ${(performance.now() - stepStart).toFixed(1)}ms`);
 
   // `dataKeyRaw` is Uint8Array<ArrayBufferLike>; copy to a plain
   // Uint8Array<ArrayBuffer> so WebCrypto accepts it as BufferSource.
   stepStart = performance.now();
   const dataKey = new Uint8Array(dataKeyRaw);
+  dataKeyRaw.fill(0);
 // eslint-disable-next-line no-console
   console.log(`[tasra:timing] dataKey copy: ${(performance.now() - stepStart).toFixed(1)}ms`);
 
@@ -429,11 +391,7 @@ export async function decryptFile(
   tasraRecord: EncryptedRecord,
   encryptedBlob: Uint8Array,
   tasraSlot: `0x${string}`,
-  options: {
-    getCredential: (slotId: string) => Promise<string>;
-    signer: TypedDataSigner;
-    identity: TasraIdentity;
-  },
+  options: DecryptOptions,
 ): Promise<Uint8Array> {
   const totalStart = performance.now();
 
@@ -448,54 +406,15 @@ export async function decryptFile(
     throw new Error('cannot decrypt: encrypted file is too short');
   }
 
-  // Obtain the holder credential for this slot.
+  // Unwrap the data key through the channel session (see decryptMessage).
   stepStart = performance.now();
-  const credential = await options.getCredential(tasraSlot);
+  const dataKeyRaw = await options.unwrapDataKey(tasraSlot, envelope);
 // eslint-disable-next-line no-console
-  console.log(`[tasra:timing] file getCredential: ${(performance.now() - stepStart).toFixed(1)}ms`);
-
-  // Build the committee-custody authorizer.
-  stepStart = performance.now();
-  const authorize = credentialAuthorization({
-    verifierAgentUrl: getVerifierAgentUrl(),
-    signer: options.signer,
-    identity: options.identity,
-    credentials: [credential],
-  });
-// eslint-disable-next-line no-console
-  console.log(`[tasra:timing] file credentialAuthorization: ${(performance.now() - stepStart).toFixed(1)}ms`);
-
-  // Unwrap the data key via threshold BLS decrypt.
-  let oid4vpStart = 0;
-  let oid4vpEnd = 0;
-  const timedAuthorize = async (request: Parameters<typeof authorize>[0]) => {
-    oid4vpStart = performance.now();
-    const grant = await authorize(request);
-    oid4vpEnd = performance.now();
-    return grant;
-  };
-
-  stepStart = performance.now();
-  const slot = await getTasraApplication().slots.bls(tasraRecord.manifest.slotId);
-// eslint-disable-next-line no-console
-  console.log(`[tasra:timing] file slots.bls: ${(performance.now() - stepStart).toFixed(1)}ms`);
-
-  stepStart = performance.now();
-  const { plaintext: dataKeyRaw } = await slot.decrypt(envelope.identity, envelope.ciphertext, {
-    authorize: timedAuthorize,
-    requireReceipts: true,
-    description: 'Decrypt a channel file',
-  });
-  const committeeEnd = performance.now();
-// eslint-disable-next-line no-console
-  console.log(`[tasra:timing]   └ OID4VP: ${(oid4vpEnd - oid4vpStart).toFixed(1)}ms`);
-// eslint-disable-next-line no-console
-  console.log(`[tasra:timing]   └ BLS keeper: ${(committeeEnd - oid4vpEnd).toFixed(1)}ms`);
-// eslint-disable-next-line no-console
-  console.log(`[tasra:timing] file slot.decrypt total: ${(committeeEnd - stepStart).toFixed(1)}ms`);
+  console.log(`[tasra:timing] file unwrap data key: ${(performance.now() - stepStart).toFixed(1)}ms`);
 
   stepStart = performance.now();
   const dataKey = new Uint8Array(dataKeyRaw);
+  dataKeyRaw.fill(0);
 // eslint-disable-next-line no-console
   console.log(`[tasra:timing] file dataKey copy: ${(performance.now() - stepStart).toFixed(1)}ms`);
 

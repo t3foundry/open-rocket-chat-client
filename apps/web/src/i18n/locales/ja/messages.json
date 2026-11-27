@@ -136,7 +136,8 @@
     "cannotDecrypt": "このメッセージは復号できません",
     "retry": "再試行",
     "encryptedFile": "暗号化されたファイル — 下のボタンで復号",
-    "clickToDecrypt": "クリックして復号・ダウンロード"
+    "clickToDecrypt": "クリックして復号・ダウンロード",
+    "balanceExhausted": "このチャンネルの残高が不足しています。チャンネルの所有者に入金を依頼してから再試行してください。"
   },
   "attachments_one": "添付ファイル {{count}}件",
   "attachments_other": "添付ファイル {{count}}件"
